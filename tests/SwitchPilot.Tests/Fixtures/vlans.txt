@@ -1,0 +1,7 @@
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Gi0/2
+10   TECHNIQUE                        active    Fa0/14
+20   BUREAUX                          active    Fa0/1, Fa0/2,
+                                                Fa0/3, Fa0/4
+1002 fddi-default                     act/unsup

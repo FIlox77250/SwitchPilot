@@ -1,0 +1,21 @@
+Starting smoke test
+Preview: description Smoke description
+Dialog: Description de Fa0/14
+Confirmed
+Completed: Simulation terminée : aucune modification envoyée.
+Preview: description Smoke description
+Dialog: Description de Fa0/14
+Confirmed
+Completed: Commandes appliquées ; état relu. Consultez les ports et VLAN pour vérifier le résultat.
+Preview: vlan 99
+Dialog: Créer le VLAN 99
+Confirmed
+Completed: Commandes appliquées ; état relu. Consultez les ports et VLAN pour vérifier le résultat.
+Preview: no vlan 99
+Dialog: Supprimer le VLAN 99
+Confirmed
+Completed: Commandes appliquées ; état relu. Consultez les ports et VLAN pour vérifier le résultat.
+Preview: test cable-diagnostics tdr interface Gi0/2
+Dialog: Test TDR · Gi0/2
+Confirmed
+Completed: Résultats TDR reçus.

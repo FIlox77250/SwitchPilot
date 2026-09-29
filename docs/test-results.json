@@ -1,0 +1,52 @@
+{
+  "integration": {
+    "total": "98",
+    "executed": "95",
+    "passed": "95",
+    "failed": "0",
+    "error": "0",
+    "timeout": "0",
+    "aborted": "0",
+    "inconclusive": "0",
+    "passedButRunAborted": "0",
+    "notRunnable": "0",
+    "notExecuted": "0",
+    "disconnected": "0",
+    "warning": "0",
+    "completed": "0",
+    "inProgress": "0",
+    "pending": "0",
+    "timing": {
+      "creation": "2026-09-30T00:56:06.3639177+02:00",
+      "queuing": "2026-09-30T00:56:06.3639178+02:00",
+      "start": "2026-09-30T00:56:05.8725087+02:00",
+      "finish": "2026-09-30T00:56:13.0227750+02:00"
+    },
+    "skipped": "3"
+  },
+  "regression": {
+    "total": "98",
+    "executed": "88",
+    "passed": "88",
+    "failed": "0",
+    "error": "0",
+    "timeout": "0",
+    "aborted": "0",
+    "inconclusive": "0",
+    "passedButRunAborted": "0",
+    "notRunnable": "0",
+    "notExecuted": "0",
+    "disconnected": "0",
+    "warning": "0",
+    "completed": "0",
+    "inProgress": "0",
+    "pending": "0",
+    "timing": {
+      "creation": "2026-09-30T01:02:49.9822947+02:00",
+      "queuing": "2026-09-30T01:02:49.9822948+02:00",
+      "start": "2026-09-30T01:02:49.4679581+02:00",
+      "finish": "2026-09-30T01:02:55.3987463+02:00"
+    },
+    "skipped": "10"
+  }
+}

@@ -1,0 +1,373 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Net.NetworkInformation;
+using System.Windows;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Threading;
+using Microsoft.Win32;
+using SwitchPilot.App.Services;
+using SwitchPilot.App.Views;
+using SwitchPilot.Core;
+using SwitchPilot.Core.Cisco;
+using SwitchPilot.Core.Diagnostics;
+using SwitchPilot.Core.Discovery;
+using SwitchPilot.Infrastructure.Cisco;
+using SwitchPilot.Infrastructure.Discovery;
+using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Storage;
+
+namespace SwitchPilot.App.ViewModels;
+
+public sealed class MainViewModel : ObservableObject, IAsyncDisposable
+{
+    private readonly UserStore store = new();
+    private readonly AuditLog audit;
+    private readonly Dispatcher dispatcher = Application.Current.Dispatcher;
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private CancellationTokenSource? operation;
+    private ISwitchDriver? driver;
+    private ConnectionProfile? profile;
+    private SwitchSnapshot? snapshot;
+    private bool disposed;
+    private DateTimeOffset lastDetection;
+    private NeighborAnnouncement? neighbor;
+    private bool busy, dryRun = true;
+    private string status = "Prêt. Connectez un switch ou explorez la démonstration.", connection = "Aucun switch connecté", search = "";
+    private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH · Cisco IOS", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
+    private LocalAdapter? adapter;
+    private PortInfo? selectedPort;
+    private VlanInfo? selectedVlan;
+    private string vlanId = "10", vlanName = "", description = "", nativeVlan = "1", allowedVlans = "1,10,20";
+    private int tab;
+    public ObservableCollection<LocalAdapter> Adapters { get; } = [];
+    public ObservableCollection<PortInfo> Ports { get; } = [];
+    public ObservableCollection<VlanInfo> Vlans { get; } = [];
+    public ObservableCollection<TdrPair> TdrPairs { get; } = [];
+    public ObservableCollection<AuditEntry> Journal { get; } = [];
+    public ICollectionView PortsView { get; }
+    public bool IsBusy { get => busy; private set { if (Set(ref busy, value)) { Raise(nameof(IsIdle)); CommandManager.InvalidateRequerySuggested(); } } }
+    public bool IsIdle => !IsBusy;
+    public bool DryRun { get => dryRun; set { Set(ref dryRun, value); Raise(nameof(ModeLabel)); } }
+    public string ModeLabel => DryRun ? "Simulation activée" : "Modifications réelles activées";
+    public bool Connected => driver?.IsConnected == true;
+    public bool IsDemo => driver?.IsDemo == true;
+    public string Status { get => status; private set => Set(ref status, value); }
+    public string Connection { get => connection; private set => Set(ref connection, value); }
+    public string Model { get => model; private set => Set(ref model, value); }
+    public string ResultSwitch { get => resultSwitch; private set => Set(ref resultSwitch, value); }
+    public string ResultPort { get => resultPort; private set => Set(ref resultPort, value); }
+    public string ResultVlan { get => resultVlan; private set => Set(ref resultVlan, value); }
+    public string ResultSpeed { get => resultSpeed; private set => Set(ref resultSpeed, value); }
+    public string ResultDuplex { get => resultDuplex; private set => Set(ref resultDuplex, value); }
+    public string DetectionNote { get => detectionNote; private set => Set(ref detectionNote, value); }
+    public string Source { get => source; private set => Set(ref source, value); }
+    public string PassiveNote { get => passiveNote; private set => Set(ref passiveNote, value); }
+    public string Counters { get => counters; private set => Set(ref counters, value); }
+    public string TdrNote { get => tdrNote; private set => Set(ref tdrNote, value); }
+    public string CaptureNote { get => captureNote; private set => Set(ref captureNote, value); }
+    public string Search { get => search; set { Set(ref search, value); PortsView.Refresh(); } }
+    public int Tab { get => tab; set => Set(ref tab, value); }
+    public string VlanId { get => vlanId; set => Set(ref vlanId, value); }
+    public string VlanName { get => vlanName; set => Set(ref vlanName, value); }
+    public string Description { get => description; set => Set(ref description, value); }
+    public string NativeVlan { get => nativeVlan; set => Set(ref nativeVlan, value); }
+    public string AllowedVlans { get => allowedVlans; set => Set(ref allowedVlans, value); }
+    public LocalAdapter? Adapter { get => adapter; set { if (Set(ref adapter, value)) ClearDetection(); } }
+    public PortInfo? SelectedPort
+    {
+        get => selectedPort;
+        set { if (Set(ref selectedPort, value)) { Description = value?.Description ?? ""; if (int.TryParse(value?.Vlan, out _)) VlanId = value!.Vlan; TdrPairs.Clear(); TdrNote = "Aucun test pour ce port."; Counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —"; PassiveNote = value is null ? "Sélectionnez un port." : SafetyPolicy.SpeedAssessment(value); Raise(nameof(SelectedPortLabel)); } }
+    }
+    public string SelectedPortLabel => SelectedPort is null ? "Sélectionnez un port" : $"{SelectedPort.Name} · {SelectedPort.StateLabel}";
+    public VlanInfo? SelectedVlan { get => selectedVlan; set { if (Set(ref selectedVlan, value) && value != null) { VlanId = value.Id.ToString(); VlanName = value.Name; } } }
+    public string PortCount => $"{Ports.Count(p => p.IsUp)} actifs / {Ports.Count} ports";
+    public ICommand ConnectCommand { get; }
+    public ICommand DemoCommand { get; }
+    public ICommand DisconnectCommand { get; }
+    public ICommand RefreshCommand { get; }
+    public ICommand DetectCommand { get; }
+    public ICommand CaptureCommand { get; }
+    public ICommand RefreshAdaptersCommand { get; }
+    public ICommand ViewPortCommand { get; }
+    public ICommand AccessCommand { get; }
+    public ICommand TrunkCommand { get; }
+    public ICommand EnableCommand { get; }
+    public ICommand DisableCommand { get; }
+    public ICommand DescriptionCommand { get; }
+    public ICommand CreateVlanCommand { get; }
+    public ICommand DeleteVlanCommand { get; }
+    public ICommand SaveCommand { get; }
+    public ICommand ExportCommand { get; }
+    public ICommand OpenBackupCommand { get; }
+    public ICommand PassiveCommand { get; }
+    public ICommand TdrCommand { get; }
+    public ICommand CancelCommand { get; }
+    public ICommand AboutCommand { get; }
+
+    public MainViewModel()
+    {
+        audit = new(Path.Combine(store.DirectoryPath, "Logs"));
+        audit.Added += item => dispatcher.Invoke(() => { Journal.Insert(0, item); if (Journal.Count > 500) Journal.RemoveAt(500); });
+        PortsView = CollectionViewSource.GetDefaultView(Ports);
+        PortsView.Filter = item => item is PortInfo p && (p.Name + " " + p.Description + " " + p.Vlan + " " + p.StateLabel).Contains(Search, StringComparison.OrdinalIgnoreCase);
+        ConnectCommand = new RelayCommand(Connect, () => !IsBusy);
+        DemoCommand = new RelayCommand(() => Run("Démonstration", StartDemo), () => !IsBusy);
+        DisconnectCommand = new RelayCommand(() => Run("Déconnexion", async _ => await Disconnect()), () => !IsBusy && driver != null);
+        RefreshCommand = new RelayCommand(() => Run("Actualisation", Refresh), CanRead);
+        DetectCommand = new RelayCommand(() => Run("Détection du port", Detect), () => CanRead() && Adapter != null);
+        CaptureCommand = new RelayCommand(() => Run("Écoute LLDP/CDP", Capture), () => !IsBusy && Adapter != null && !IsDemo);
+        RefreshAdaptersCommand = new RelayCommand(RefreshAdapters, () => !IsBusy && !IsDemo);
+        ViewPortCommand = new RelayCommand(() => { SelectedPort = Ports.FirstOrDefault(p => p.Name == ResultPort); Tab = 1; }, () => Ports.Any(p => p.Name == ResultPort));
+        AccessCommand = Change(() => CommandPlan.Access(SelectedPort!.Name, ParseVlan()), CanEditPort);
+        TrunkCommand = Change(() => CommandPlan.Trunk(SelectedPort!.Name, int.Parse(NativeVlan), AllowedVlans), CanEditPort);
+        EnableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, true), CanEditPort);
+        DisableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, false), CanEditPort);
+        DescriptionCommand = Change(() => CommandPlan.Describe(SelectedPort!.Name, Description), CanEditPort);
+        CreateVlanCommand = Change(() => CommandPlan.CreateVlan(ParseVlan(), VlanName), CanRead);
+        DeleteVlanCommand = Change(() => CommandPlan.DeleteVlan(SelectedVlan!.Id), () => CanRead() && SelectedVlan != null);
+        SaveCommand = Change(CommandPlan.Save, CanRead);
+        ExportCommand = new RelayCommand(() => Run("Export chiffré", Export), CanRead);
+        OpenBackupCommand = new RelayCommand(OpenBackup, () => !IsBusy);
+        PassiveCommand = new RelayCommand(() => Run("Contrôle passif", Passive), CanEditPort);
+        TdrCommand = new RelayCommand(() => Run("Test de câble TDR", Tdr), CanEditPort);
+        CancelCommand = new RelayCommand(() => operation?.Cancel(), () => IsBusy);
+        AboutCommand = new RelayCommand(() =>
+        {
+            var assembly = typeof(MainViewModel).Assembly;
+            var text = new System.Text.StringBuilder($"Switch Pilot · {assembly.GetName().Version?.ToString(3)}\nGestion de switchs Cisco IOS\n\n");
+            foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.StartsWith("SwitchPilot.Notices") || n.StartsWith("SwitchPilot.Licenses")))
+            {
+                using var reader = new StreamReader(assembly.GetManifestResourceStream(resource)!);
+                text.AppendLine(resource).AppendLine(reader.ReadToEnd()).AppendLine();
+            }
+            Dialogs.ShowText("À propos · Licences", text.ToString());
+        }, () => !IsBusy);
+        try { store.Load(); } catch { Status = "Paramètres chiffrés illisibles pour ce compte Windows. Le fichier est conservé ; connectez-vous manuellement."; }
+        RefreshAdapters();
+        NetworkChange.NetworkAddressChanged += NetworkChanged;
+        timer.Tick += Tick; timer.Start();
+    }
+    private bool CanRead() => !IsBusy && Connected;
+    private bool CanEditPort() => CanRead() && SelectedPort != null;
+    private int ParseVlan() => int.TryParse(VlanId, out var value) ? value : throw new ArgumentException("Numéro de VLAN invalide.");
+    private ICommand Change(Func<CommandPlan> build, Func<bool> can) => new RelayCommand(() => Run("Configuration", async ct =>
+    {
+        var plan = build();
+        if (!Dialogs.Preview(plan, DryRun)) return;
+        await driver!.ApplyAsync(plan, DryRun, ct);
+        if (!DryRun) { await Refresh(ct); ClearDetection(); }
+        Status = DryRun ? "Simulation terminée : aucune modification envoyée." : "Commandes appliquées ; état relu. Consultez les ports et VLAN pour vérifier le résultat.";
+    }), can);
+    private async void Run(string action, Func<CancellationToken, Task> task)
+    {
+        if (IsBusy || disposed) return;
+        IsBusy = true; Status = action + "…";
+        operation = new CancellationTokenSource();
+        try { await task(operation.Token); }
+        catch (OperationCanceledException) { Status = "Opération annulée. Si des commandes avaient été envoyées, vérifiez l'état du switch."; audit.Write(action, "Annulée ; état à vérifier."); }
+        catch (Exception e)
+        {
+            Status = FriendlyError(e); audit.Write(action, "Échec : " + e.GetType().Name);
+            if (action.Contains("TDR")) TdrNote = Status;
+            if (action.Contains("TDR") && e is NotSupportedException && Connected && SelectedPort != null)
+            {
+                try { await Passive(operation.Token); Status = TdrNote + " Contrôle passif effectué."; }
+                catch { Status = TdrNote + " Le contrôle passif n'a pas pu aboutir."; }
+            }
+            if (action.Contains("Détection")) ClearDetection();
+        }
+        finally
+        {
+            operation.Dispose(); operation = null; IsBusy = false;
+            if (driver != null && !Connected) { Connection = "Session déconnectée"; ClearDetection(); }
+            Raise(nameof(Connected));
+            if (audit.PersistenceError != null) Status += " " + audit.PersistenceError;
+        }
+    }
+    private static string FriendlyError(Exception e) => e switch
+    {
+        Renci.SshNet.Common.SshAuthenticationException => "Authentification SSH refusée. Vérifiez les identifiants et les droits IOS.",
+        Renci.SshNet.Common.SshConnectionException => "Connexion SSH refusée ou négociation incompatible. Vérifiez la clé du switch et, pour un ancien IOS, l'option de compatibilité.",
+        System.Net.Sockets.SocketException => "Switch inaccessible. Vérifiez l'adresse, le routage et le port SSH.",
+        _ when e is ArgumentException or InvalidOperationException or NotSupportedException or TimeoutException or FormatException or CliException or IOException => e.Message,
+        _ => $"L'opération a échoué ({e.GetType().Name}). Vérifiez la connexion et le journal."
+    };
+    private void Connect()
+    {
+        var dialog = new ConnectionWindow(store.Settings.Profiles);
+        if (dialog.ShowDialog() != true || dialog.Profile is null) return;
+        var selected = dialog.Profile; var legacy = dialog.LegacyAlgorithms;
+        Run("Connexion SSH", async ct =>
+        {
+            await Disconnect();
+            var session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, legacy, ct), ct);
+            driver = new CiscoIosDriver(session, audit);
+            profile = selected with { Password = "", EnablePassword = "" };
+            store.SaveProfile(selected);
+            selected = selected with { Password = "", EnablePassword = "" };
+            audit.Write("Connexion SSH", legacy ? "Connecté avec compatibilité ancien IOS." : "Connecté.");
+            Raise(nameof(IsDemo)); Raise(nameof(Connected));
+            await Refresh(ct); await Detect(ct);
+        });
+    }
+    private bool Trust(string host, string fingerprint) => dispatcher.Invoke(() =>
+    {
+        var known = store.KnownFingerprint(host);
+        if (known == fingerprint) return true;
+        var text = known == null ? $"Première connexion à {host}.\n\nEmpreinte SHA-256 :\n{fingerprint}\n\nVérifiez cette empreinte auprès de l'administrateur avant de l'accepter." :
+            $"La clé SSH de {host} a changé.\n\nAncienne : {known}\nNouvelle : {fingerprint}\n\nN'acceptez que si ce changement a été vérifié.";
+        if (!Dialogs.Confirm(text, "Vérification de la clé SSH")) return false;
+        store.Trust(host, fingerprint); return true;
+    });
+    private async Task StartDemo(CancellationToken ct)
+    {
+        await Disconnect(); driver = new DemoSwitchDriver(audit);
+        Adapters.Clear(); Adapters.Add(new("demo", "Ethernet de démonstration", "001122334455", true, 100000000, "192.168.10.42")); Adapter = Adapters[0];
+        Raise(nameof(IsDemo)); Raise(nameof(Connected)); await Refresh(ct); await Detect(ct);
+        Status = "Démonstration active : données fictives, aucune connexion réseau.";
+    }
+    private async Task Disconnect()
+    {
+        if (driver != null) await driver.DisposeAsync();
+        driver = null; profile = null; snapshot = null; Ports.Clear(); Vlans.Clear(); TdrPairs.Clear(); SelectedPort = null; SelectedVlan = null;
+        Connection = "Aucun switch connecté"; Model = "SSH · Cisco IOS"; ClearDetection(); RefreshAdapters();
+        Raise(nameof(IsDemo)); Raise(nameof(Connected)); Raise(nameof(PortCount)); Status = "Déconnecté.";
+    }
+    private async Task Refresh(CancellationToken ct)
+    {
+        var selected = SelectedPort?.Name;
+        snapshot = await driver!.ReadSnapshotAsync(ct);
+        Ports.Clear(); foreach (var p in snapshot.Ports) Ports.Add(p);
+        Vlans.Clear(); foreach (var v in snapshot.Vlans) Vlans.Add(v);
+        SelectedPort = Ports.FirstOrDefault(p => p.Name == selected);
+        Connection = snapshot.Identity.Name + (IsDemo ? " · Démonstration" : " · Connecté");
+        Model = snapshot.Identity.Model + " · IOS " + snapshot.Identity.IosVersion;
+        Raise(nameof(PortCount)); Status = "État des ports et VLAN actualisé.";
+    }
+    private async Task Detect(CancellationToken ct)
+    {
+        if (Adapter == null) { ClearDetection(); Status = "Aucune carte Ethernet physique disponible."; return; }
+        if (!IsDemo)
+        {
+            var current = NetworkDiscovery.Adapters().FirstOrDefault(a => a.Id == Adapter.Id);
+            if (current is null || !current.IsUp) { ClearDetection(); Status = "La carte Ethernet sélectionnée est débranchée."; return; }
+            if (current.Mac != Adapter.Mac) { RefreshAdapters(); ClearDetection(); return; }
+        }
+        var observation = await driver!.ReadDetectionAsync(Adapter.Mac, ct);
+        var entries = observation.Entries;
+        if (!IsDemo && !NetworkDiscovery.Adapters().Any(a => a.Id == Adapter.Id && a.Mac == Adapter.Mac && a.IsUp))
+        { ClearDetection(); Status = "Le lien a changé pendant la détection. Relancez la recherche."; return; }
+        var results = PortLocator.Find(Adapter.Mac, observation.Snapshot, entries);
+        ClearDetection();
+        if (results.Count == 0) { DetectionNote = "MAC absente de ce switch. Le poste doit émettre du trafic dans le VLAN ; essayez un autre switch du profil. Un routeur masque la MAC du poste."; Status = "MAC non trouvée sur ce switch."; return; }
+        if (results.Count != 1) { DetectionNote = "Plusieurs correspondances : " + string.Join(", ", results.Select(r => $"{r.Entry.Port} / VLAN {r.Entry.Vlan}")) + ". Aucun port unique confirmé."; Status = "Détection ambiguë."; return; }
+        var result = results[0]; lastDetection = DateTimeOffset.UtcNow;
+        ResultSwitch = result.SwitchName; ResultPort = result.Port.Name; ResultVlan = result.Entry.Vlan.ToString(); ResultSpeed = result.Port.SpeedLabel; ResultDuplex = result.Port.DuplexLabel;
+        DetectionNote = result.Note; Source = $"{(IsDemo ? "Démonstration" : "Table MAC SSH")} · {DateTime.Now:HH:mm:ss}";
+        PassiveNote = SafetyPolicy.SpeedAssessment(result.Port);
+        var summary = $"{ResultSwitch}, {ResultPort}, VLAN {ResultVlan}, {ResultSpeed} {ResultDuplex}";
+        if (summary != detectionSummary) { audit.Write("Détection du port", summary); detectionSummary = summary; }
+        Status = summary;
+    }
+    private async Task Capture(CancellationToken ct)
+    {
+        ClearDetection(); CaptureNote = "Écoute sur la carte sélectionnée pendant 65 secondes maximum…";
+        try
+        {
+            neighbor = await NeighborCapture.ListenAsync(Adapter!, TimeSpan.FromSeconds(65), ct);
+            ResultSwitch = neighbor.SwitchName; ResultPort = neighbor.Port; ResultVlan = neighbor.Vlan?.ToString() ?? "Non annoncé";
+            Source = neighbor.Protocol + $" · {neighbor.ReceivedAt.ToLocalTime():HH:mm:ss}";
+            DetectionNote = "Annonce reçue localement, non authentifiée. Le VLAN annoncé peut être le VLAN natif ; vitesse et duplex non déduits.";
+            CaptureNote = $"Annonce {neighbor.Protocol} reçue, valable {neighbor.TtlSeconds} s."; Status = "Voisin découvert sans identifiants SSH.";
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            CaptureNote = FriendlyError(e);
+            if (Connected) { await Detect(ct); Status = CaptureNote + " Détection SSH effectuée."; }
+            else Status = CaptureNote;
+        }
+    }
+    private async Task Passive(CancellationToken ct)
+    {
+        var port = SelectedPort!; var reading = await driver!.ReadCountersAsync(port.Name, ct);
+        Counters = $"Lien {reading.LinkState} · {reading.Speed} Mb/s / {reading.Duplex}\nCRC {reading.Crc?.ToString() ?? "—"}   ·   Collisions {reading.Collisions?.ToString() ?? "—"}   ·   Erreurs entrantes {reading.InputErrors?.ToString() ?? "—"}";
+        var measured = port with { Speed = reading.Speed, Duplex = reading.Duplex, Status = reading.LinkState == "Actif" ? "connected" : "notconnect" };
+        PassiveNote = (reading.LinkState == "Inconnu" ? "État du lien non reconnu." : SafetyPolicy.SpeedAssessment(measured)) + " Les compteurs sont cumulatifs depuis leur dernière remise à zéro.";
+        if (reading.Crc > 0 || reading.Collisions > 0) PassiveNote += " Des erreurs sont présentes : contrôlez leur progression et les deux extrémités.";
+        Status = $"Contrôle passif de {port.Name} terminé."; audit.Write("Contrôle passif " + port.Name, "Compteurs lus.");
+    }
+    private async Task<SafetyContext> Safety(CancellationToken ct)
+    {
+        if (IsDemo) return new(true, true, new HashSet<string> { "Fa0/14", "Gi0/1" });
+        if (Adapter == null || profile == null || !await NetworkDiscovery.RoutesViaAsync(profile.Host, Adapter, ct)) return SafetyContext.Unknown;
+        var fresh = await driver!.ReadSnapshotAsync(ct); var entries = await driver.ReadMacTableAsync(ct);
+        var candidates = PortLocator.Find(Adapter.Mac, fresh, entries);
+        var localMacs = NetworkDiscovery.Adapters().Select(a => a.Mac).ToHashSet();
+        var protectedPorts = entries.Where(e => localMacs.Contains(e.Mac)).Select(e => e.Port).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var port in fresh.Ports.Where(p => p.IsTrunk || p.Name.StartsWith("Po"))) protectedPorts.Add(port.Name);
+        return new(true, candidates.Count == 1 && candidates[0].DirectCandidate, protectedPorts);
+    }
+    private async Task Tdr(CancellationToken ct)
+    {
+        var port = SelectedPort!;
+        var safety = await Safety(ct); SafetyPolicy.RequireSafeTdr(port, safety);
+        var commands = $"test cable-diagnostics tdr interface {port.Name}\nshow cable-diagnostics tdr interface {port.Name}";
+        var warning = DryRun ? "Simulation : les commandes seront affichées et aucune ne sera envoyée." :
+            "Ce test peut couper brièvement le lien du port et perturber l'équipement connecté. Le port du poste est protégé. Confirmez l'interruption du port sélectionné.";
+        if (!Dialogs.PreviewText($"Test TDR · {port.Name}", commands, warning, DryRun ? "Simuler le test" : "Lancer le test")) return;
+        TdrPairs.Clear();
+        if (DryRun) { TdrNote = "Simulation : aucun test lancé."; Status = TdrNote; audit.Write("TDR " + port.Name, TdrNote); return; }
+        // Revalidate after the confirmation: the dialog may have remained open for a long time.
+        safety = await Safety(ct);
+        var result = await driver!.RunTdrAsync(port.Name, safety, ct);
+        foreach (var pair in result.Pairs) TdrPairs.Add(pair);
+        TdrNote = result.Note; Status = "Résultats TDR reçus.";
+    }
+    private async Task Export(CancellationToken ct)
+    {
+        var dialog = new SaveFileDialog { Filter = "Sauvegarde chiffrée Switch Pilot|*.spbackup", FileName = $"SwitchPilot-{DateTime.Now:yyyyMMdd-HHmm}.spbackup" };
+        if (dialog.ShowDialog() != true) return;
+        var config = await driver!.ExportAsync(ct);
+        UserStore.ExportEncrypted(dialog.FileName, config);
+        audit.Write("Export de configuration", "Sauvegarde complète chiffrée avec DPAPI.");
+        Status = "Sauvegarde chiffrée créée. Lecture avec ce compte Windows via « Lire une sauvegarde ».";
+    }
+    private void OpenBackup()
+    {
+        var dialog = new OpenFileDialog { Filter = "Sauvegarde chiffrée Switch Pilot|*.spbackup" };
+        if (dialog.ShowDialog() != true) return;
+        try { Dialogs.ShowText("Configuration sauvegardée · lecture en mémoire", UserStore.ReadEncryptedExport(dialog.FileName)); }
+        catch { Status = "Impossible de déchiffrer ce fichier avec ce compte Windows, ou fichier corrompu."; }
+    }
+    private void RefreshAdapters()
+    {
+        var selected = Adapter?.Id;
+        Adapters.Clear(); foreach (var a in NetworkDiscovery.Adapters()) Adapters.Add(a);
+        Adapter = Adapters.FirstOrDefault(a => a.Id == selected) ?? Adapters.FirstOrDefault();
+    }
+    private void ClearDetection()
+    {
+        neighbor = null; lastDetection = default;
+        ResultSwitch = "Votre point de connexion"; ResultPort = "—"; ResultVlan = "—"; ResultSpeed = "—"; ResultDuplex = "—";
+        Source = "Aucune détection actuelle"; DetectionNote = "Lancez une détection sur la carte Ethernet sélectionnée.";
+    }
+    private void NetworkChanged(object? sender, EventArgs e) => dispatcher.BeginInvoke(() =>
+    {
+        if (disposed || IsDemo) return;
+        ClearDetection();
+        if (!IsBusy) { RefreshAdapters(); if (Connected) Run("Détection après changement réseau", Detect); }
+    });
+    private void Tick(object? sender, EventArgs e)
+    {
+        if (disposed || IsBusy || IsDemo) return;
+        if (neighbor != null && DateTimeOffset.UtcNow - neighbor.ReceivedAt > TimeSpan.FromSeconds(neighbor.TtlSeconds)) { ClearDetection(); CaptureNote = "Annonce LLDP/CDP expirée. Relancez l'écoute."; }
+        if (Connected && snapshot != null && Adapter != null && neighbor == null) Run("Détection automatique", Detect);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true; timer.Stop(); NetworkChange.NetworkAddressChanged -= NetworkChanged; operation?.Cancel();
+        if (driver != null) await driver.DisposeAsync();
+    }
+}

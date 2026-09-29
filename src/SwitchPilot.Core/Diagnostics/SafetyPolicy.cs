@@ -1,0 +1,27 @@
+using SwitchPilot.Core.Cisco;
+
+namespace SwitchPilot.Core.Diagnostics;
+
+public static class SafetyPolicy
+{
+    public static void RequireSafeTdr(PortInfo port, SafetyContext context)
+    {
+        var age = DateTimeOffset.UtcNow - context.ObservedAt;
+        if (!context.IsFresh || !context.ManagementPathKnown || age > TimeSpan.FromSeconds(30) || age < TimeSpan.FromSeconds(-5))
+            throw new InvalidOperationException("TDR bloqué : le chemin de connexion du poste n'est pas identifié avec certitude. Relancez la détection sur une connexion Ethernet directe.");
+        if (context.ProtectedPorts.Any(p => CiscoParser.NormalizeInterface(p).Equals(CiscoParser.NormalizeInterface(port.Name), StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("TDR bloqué : ce port transporte la connexion du poste.");
+        if (port.IsTrunk || port.Mode != "access" || port.Name.StartsWith("Po"))
+            throw new InvalidOperationException("TDR bloqué sur un trunk, un agrégat ou un port de mode inconnu.");
+        if (port.Media.Contains("SFP", StringComparison.OrdinalIgnoreCase) || !port.Media.Contains("BaseTX", StringComparison.OrdinalIgnoreCase) && !port.Media.Contains("BaseT", StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException("TDR indisponible : interface cuivre compatible non identifiée. Le contrôle passif reste disponible.");
+    }
+    public static string SpeedAssessment(PortInfo port)
+    {
+        if (!port.IsUp) return "Lien inactif : aucune vitesse négociée.";
+        if (port.Name.StartsWith("Fa")) return "Port Fast Ethernet : 100 Mb/s est une vitesse normale.";
+        if (port.Name.StartsWith("Gi") && port.Speed.Replace("a-", "") == "100")
+            return "Port Gigabit négocié à 100 Mb/s : vérifier aussi la carte distante et la vitesse forcée, avant d'incriminer le câble.";
+        return "Vitesse à comparer aux capacités et à la configuration des deux extrémités.";
+    }
+}

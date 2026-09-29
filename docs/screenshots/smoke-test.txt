@@ -1,0 +1,1 @@
+PASS: WPF startup; demo detection; five tabs; connection form; passive counters; own-port TDR guard; encrypted profile and backup; forget credentials; dry-run; command previews; description apply; VLAN create/delete; four-pair TDR table.

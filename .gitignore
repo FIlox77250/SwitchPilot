@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+.tools/
+.vs/
+artifacts/
+TestResults/
+*.user
+*.pfx
+*.spbackup

@@ -1,0 +1,42 @@
+name: Windows build and validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise SSH transport against local emulator
+        shell: pwsh
+        run: |
+          python -m pip install paramiko==5.0.0
+          python tests/ssh_emulator.py
+          if ($LASTEXITCODE -ne 0) { throw 'SSH integration tests failed' }
+      - name: Test and publish portable EXE
+        shell: pwsh
+        run: ./build/build.ps1
+      - name: Exercise WPF demonstration and capture screens
+        shell: pwsh
+        run: |
+          $p = Start-Process ./artifacts/win-x64/SwitchPilot.exe -ArgumentList '--smoke-test' -PassThru
+          if (!$p.WaitForExit(60000)) { $p.Kill(); throw 'WPF smoke test timed out' }
+          if ($p.ExitCode -ne 0) { throw 'WPF smoke test failed' }
+          Copy-Item "$env:APPDATA/SwitchPilot/SmokeTest" ./artifacts/screens -Recurse
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SwitchPilot-Windows
+          path: |
+            artifacts/
+            tests/SwitchPilot.Tests/TestResults/

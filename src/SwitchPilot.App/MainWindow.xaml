@@ -1,0 +1,310 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="SwitchPilot.App.MainWindow" Style="{StaticResource {x:Type Window}}" Title="Switch Pilot" Width="1320" Height="900" MinWidth="1060" MinHeight="730" Icon="Assets/SwitchPilot.ico" WindowStartupLocation="CenterScreen">
+  <Grid Margin="32,24,32,16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid Margin="0,0,0,22">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Border Width="44" Height="44" Background="{StaticResource Accent}" CornerRadius="12" Margin="0,0,14,0">
+          <Grid Margin="10">
+            <Grid.RowDefinitions>
+              <RowDefinition/>
+              <RowDefinition/>
+            </Grid.RowDefinitions>
+            <UniformGrid Columns="3" Margin="0,2">
+              <Border Background="White" CornerRadius="1" Margin="1"/>
+              <Border Background="White" CornerRadius="1" Margin="1"/>
+              <Border Background="White" CornerRadius="1" Margin="1"/>
+            </UniformGrid>
+            <Border Grid.Row="1" Height="2" Background="#ADCAD9" VerticalAlignment="Center" Margin="2,0"/>
+          </Grid>
+        </Border>
+        <StackPanel>
+          <TextBlock Text="Switch Pilot" FontSize="24" FontWeight="SemiBold"/>
+          <TextBlock Text="Votre réseau, à portée de main." Style="{StaticResource MutedText}"/>
+        </StackPanel>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="À propos" Command="{Binding AboutCommand}"/>
+        <Button Content="Démonstration" Command="{Binding DemoCommand}"/>
+        <Button Content="Connecter un switch" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}"/>
+      </StackPanel>
+    </Grid>
+    <Border Grid.Row="1" Background="#EAF0F3" CornerRadius="10" Padding="18,12" Margin="0,0,0,20">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="{Binding Connection}" FontWeight="SemiBold"/>
+          <TextBlock Text="{Binding Model}" Style="{StaticResource MutedText}" Margin="0,3,0,0"/>
+        </StackPanel>
+        <CheckBox Grid.Column="1" IsChecked="{Binding DryRun}" Content="Simulation des modifications" VerticalAlignment="Center" Margin="20,0" IsEnabled="{Binding IsIdle}" ToolTip="Activé : les commandes sont présentées mais aucune modification n'est envoyée."/>
+        <Button Grid.Column="2" Content="Déconnecter" Command="{Binding DisconnectCommand}" VerticalAlignment="Center" Padding="12,7"/>
+      </Grid>
+    </Border>
+    <TabControl Grid.Row="2" SelectedIndex="{Binding Tab}">
+      <TabItem Header="Mon branchement">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="320"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Margin="0,0,22,0">
+              <TextBlock Text="Retrouvez votre port." FontSize="30" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <TextBlock Text="Identifiez le switch et l'interface associés à votre carte Ethernet." Foreground="{StaticResource Muted}" Margin="0,0,0,24"/>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                  <TextBlock Text="CARTE RÉSEAU" Style="{StaticResource Label}"/>
+                  <ComboBox ItemsSource="{Binding Adapters}" SelectedItem="{Binding Adapter}" DisplayMemberPath="Label" IsEnabled="{Binding IsIdle}" AutomationProperties.Name="Carte Ethernet"/>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Actualiser" Command="{Binding RefreshAdaptersCommand}" VerticalAlignment="Center" Margin="0,9,0,0"/>
+              </Grid>
+              <Border Style="{StaticResource Card}" Padding="30" Margin="0,12,0,18">
+                <StackPanel>
+                  <TextBlock Text="{Binding Source}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,24"/>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock Text="{Binding ResultSwitch}" FontSize="27" FontWeight="SemiBold"/>
+                      <TextBlock Text="Switch identifié" Style="{StaticResource MutedText}" Margin="0,6,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                      <TextBlock Text="{Binding ResultPort}" FontSize="34" FontWeight="SemiBold" Foreground="{StaticResource Accent}"/>
+                      <TextBlock Text="Port du switch" Style="{StaticResource MutedText}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                  </Grid>
+                  <Border Height="1" Background="{StaticResource Line}" Margin="0,26,0,22"/>
+                  <UniformGrid Columns="3">
+                    <StackPanel>
+                      <TextBlock Text="VLAN" Style="{StaticResource Label}"/>
+                      <TextBlock Text="{Binding ResultVlan}" FontSize="22" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel>
+                      <TextBlock Text="VITESSE" Style="{StaticResource Label}"/>
+                      <TextBlock Text="{Binding ResultSpeed}" FontSize="22" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel>
+                      <TextBlock Text="DUPLEX" Style="{StaticResource Label}"/>
+                      <TextBlock Text="{Binding ResultDuplex}" FontSize="22" FontWeight="SemiBold"/>
+                    </StackPanel>
+                  </UniformGrid>
+                  <TextBlock Text="{Binding DetectionNote}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,24,0,22"/>
+                  <StackPanel Orientation="Horizontal">
+                    <Button Content="Détecter mon port" Command="{Binding DetectCommand}" Style="{StaticResource PrimaryButton}"/>
+                    <Button Content="Voir le port" Command="{Binding ViewPortCommand}"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,5,0,0">
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Sans identifiants" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                  <TextBlock Text="Écoutez les annonces envoyées par votre switch sur le câble Ethernet." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
+                  <Button Content="Écouter LLDP / CDP" Command="{Binding CaptureCommand}" Margin="0,0,0,16"/>
+                  <TextBlock Text="{Binding CaptureNote}" Style="{StaticResource MutedText}"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Un résultat traçable" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                  <TextBlock Text="Chaque détection indique sa source. Une MAC vue sur un uplink reste un indice, pas la preuve d'un branchement direct." Foreground="{StaticResource Muted}"/>
+                  <Border Height="1" Background="{StaticResource Line}" Margin="0,20"/>
+                  <TextBlock Text="Les numéros des prises murales peuvent être conservés dans les descriptions des ports." Style="{StaticResource MutedText}"/>
+                </StackPanel>
+              </Border>
+              <Button Content="Lire une sauvegarde chiffrée" Command="{Binding OpenBackupCommand}" Margin="0"/>
+            </StackPanel>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="Ports">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="310"/>
+          </Grid.ColumnDefinitions>
+          <Grid Margin="0,0,20,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+              <Button DockPanel.Dock="Right" Content="Actualiser" Command="{Binding RefreshCommand}" Margin="12,0,0,0"/>
+              <TextBox Tag="Rechercher un port, une description, un VLAN…" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Margin="0" VerticalContentAlignment="Center" ToolTip="Filtrer par port, description, VLAN ou état" AutomationProperties.Name="Rechercher un port"/>
+            </DockPanel>
+            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" ClipToBounds="True" Margin="0">
+              <DataGrid IsEnabled="{Binding IsIdle}" ItemsSource="{Binding PortsView}" SelectedItem="{Binding SelectedPort}" AutomationProperties.Name="Ports du switch">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Port" Binding="{Binding Name}" Width="80"/>
+                  <DataGridTextColumn Header="État" Binding="{Binding StateLabel}" Width="100"/>
+                  <DataGridTextColumn Header="VLAN" Binding="{Binding Vlan}" Width="65"/>
+                  <DataGridTextColumn Header="Vitesse" Binding="{Binding SpeedLabel}" Width="100"/>
+                  <DataGridTextColumn Header="Duplex" Binding="{Binding DuplexLabel}" Width="80"/>
+                  <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="85"/>
+                  <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="100"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Border>
+            <TextBlock Grid.Row="2" Text="{Binding PortCount}" Style="{StaticResource MutedText}" Margin="2,12,0,0"/>
+          </Grid>
+          <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <Border Style="{StaticResource Card}" Padding="22">
+              <StackPanel>
+                <TextBlock Text="{Binding SelectedPortLabel}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                <TextBlock Text="Description" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" MaxLength="200"/>
+                <Button Content="Modifier la description" Command="{Binding DescriptionCommand}" Margin="0,0,0,20"/>
+                <TextBlock Text="VLAN access" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding VlanId, UpdateSourceTrigger=PropertyChanged}" MaxLength="4"/>
+                <Button Content="Affecter au VLAN" Command="{Binding AccessCommand}" Margin="0,0,0,20"/>
+                <TextBlock Text="Trunk · VLAN natif" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding NativeVlan, UpdateSourceTrigger=PropertyChanged}" MaxLength="4"/>
+                <TextBlock Text="VLAN autorisés · ex. 1,10,20-30" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding AllowedVlans, UpdateSourceTrigger=PropertyChanged}" MaxLength="180"/>
+                <Button Content="Configurer en trunk" Command="{Binding TrunkCommand}" Margin="0,0,0,20"/>
+                <StackPanel Orientation="Horizontal">
+                  <Button Content="Activer" Command="{Binding EnableCommand}"/>
+                  <Button Content="Désactiver" Command="{Binding DisableCommand}"/>
+                </StackPanel>
+                <TextBlock Text="Chaque action présente les commandes avant leur envoi." Style="{StaticResource MutedText}" Margin="0,20,0,0"/>
+              </StackPanel>
+            </Border>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+      <TabItem Header="VLANs">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="310"/>
+          </Grid.ColumnDefinitions>
+          <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,20,0">
+            <DataGrid IsEnabled="{Binding IsIdle}" ItemsSource="{Binding Vlans}" SelectedItem="{Binding SelectedVlan}">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="VLAN" Binding="{Binding Id}" Width="85"/>
+                <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="160"/>
+                <DataGridTextColumn Header="État" Binding="{Binding Status}" Width="100"/>
+                <DataGridTextColumn Header="Ports" Binding="{Binding Ports}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Border>
+          <StackPanel Grid.Column="1">
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Text="Gérer les VLANs" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                <TextBlock Text="Identifiant" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding VlanId, UpdateSourceTrigger=PropertyChanged}" MaxLength="4"/>
+                <TextBlock Text="Nom · 32 caractères, sans espace" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding VlanName, UpdateSourceTrigger=PropertyChanged}" MaxLength="32"/>
+                <Button Content="Créer / renommer" Command="{Binding CreateVlanCommand}" Margin="0,0,0,12"/>
+                <Button Content="Supprimer le VLAN sélectionné" Command="{Binding DeleteVlanCommand}" Margin="0"/>
+                <TextBlock Text="La suppression est bloquée si des ports y sont encore affectés. Vérifiez aussi les trunks et les autres équipements." Style="{StaticResource MutedText}" Margin="0,20,0,0"/>
+              </StackPanel>
+            </Border>
+            <Button Content="Actualiser les VLANs" Command="{Binding RefreshCommand}"/>
+          </StackPanel>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Diagnostics">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <TextBlock Text="Comprendre le lien." FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <ComboBox ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" DisplayMemberPath="Name" Width="260" HorizontalAlignment="Left" IsEnabled="{Binding IsIdle}" AutomationProperties.Name="Port à diagnostiquer"/>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource Card}" Margin="0,8,20,18">
+                <StackPanel>
+                  <TextBlock Text="Contrôle passif" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,18"/>
+                  <TextBlock Text="{Binding Counters}" FontSize="16" Margin="0,0,0,18"/>
+                  <TextBlock Text="{Binding PassiveNote}" Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
+                  <Button Content="Lire les compteurs" Command="{Binding PassiveCommand}" HorizontalAlignment="Left"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,8,0,18">
+                <StackPanel>
+                  <TextBlock Text="Test de câble TDR" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,18"/>
+                  <TextBlock Text="Le test peut interrompre le lien. Il est bloqué sur le port du poste, les trunks et lorsque le chemin de connexion est incertain." Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
+                  <Button Content="Préparer le test TDR" Command="{Binding TdrCommand}" HorizontalAlignment="Left"/>
+                  <TextBlock Text="{Binding TdrNote}" Style="{StaticResource MutedText}" Margin="0,16,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Border Style="{StaticResource Card}" Padding="0">
+              <DataGrid ItemsSource="{Binding TdrPairs}" MinHeight="200">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Paire locale" Binding="{Binding Pair}" Width="150"/>
+                  <DataGridTextColumn Header="État" Binding="{Binding Status}" Width="*"/>
+                  <DataGridTextColumn Header="Longueur estimée" Binding="{Binding Length}" Width="250"/>
+                  <DataGridTextColumn Header="Paire distante" Binding="{Binding RemotePair}" Width="180"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="Journal">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <TextBlock Text="Historique de la session · Les actions sont conservées 30 jours dans votre dossier utilisateur. Aucun mot de passe ni sortie CLI brute n'est journalisé." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
+          <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" Margin="0">
+            <DataGrid ItemsSource="{Binding Journal}">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Heure" Binding="{Binding TimeLabel}" Width="100"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="250"/>
+                <DataGridTextColumn Header="Résultat" Binding="{Binding Result}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Border>
+        </Grid>
+      </TabItem>
+    </TabControl>
+    <Grid Grid.Row="3" Margin="0,20,0,0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <ProgressBar IsIndeterminate="{Binding IsBusy}" Height="2" BorderThickness="0" Background="#E5E9EC" Foreground="{StaticResource Accent}"/>
+      <Grid Grid.Row="1" Margin="0,14,0,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
+          <TextBlock Text="{Binding Status}" FontSize="12" MaxHeight="48" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}"/>
+          <TextBlock Text="{Binding ModeLabel}" Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button Content="Annuler" Command="{Binding CancelCommand}"/>
+          <Button Content="Exporter la configuration" Command="{Binding ExportCommand}"/>
+          <Button Content="Sauvegarder · write memory" Command="{Binding SaveCommand}"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

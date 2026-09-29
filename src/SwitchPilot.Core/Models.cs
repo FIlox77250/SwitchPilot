@@ -1,0 +1,61 @@
+namespace SwitchPilot.Core;
+
+public record PortInfo(string Name, string Description, string Status, string Vlan, string Duplex,
+    string Speed, string Media, string Mode = "Inconnu")
+{
+    public bool IsUp => Status.Equals("connected", StringComparison.OrdinalIgnoreCase);
+    public string StateLabel => Status switch { "connected" => "Actif", "notconnect" => "Débranché", "disabled" => "Désactivé", "err-disabled" => "Erreur", _ => Status };
+    public string SpeedLabel => Speed.Replace("a-", "") is var s && int.TryParse(s, out _) ? s + " Mb/s" : Speed;
+    public string DuplexLabel => Duplex.Replace("a-", "");
+    public bool IsTrunk => Mode == "trunk" || Vlan == "trunk";
+    public override string ToString() => Name;
+}
+public record VlanInfo(int Id, string Name, string Status, string Ports);
+public record MacEntry(int Vlan, string Mac, string Type, string Port);
+public record SwitchIdentity(string Name, string Model, string IosVersion);
+public record InterfaceCounters(long? Crc, long? Collisions, long? InputErrors, string Speed, string Duplex, string LinkState = "Inconnu");
+public record TdrPair(string Pair, string Length, string RemotePair, string Status);
+public record TdrResult(string Port, IReadOnlyList<TdrPair> Pairs, string Note);
+public record NeighborAnnouncement(string Protocol, string SwitchName, string Port, int? Vlan, int TtlSeconds, DateTimeOffset ReceivedAt);
+public record LocalAdapter(string Id, string Name, string Mac, bool IsUp, long Speed, string Addresses)
+{
+    public string Label => $"{Name} · {(IsUp ? "connecté" : "débranché")} · {Mac}";
+    public override string ToString() => Label;
+}
+public record PortDetection(string SwitchName, MacEntry Entry, PortInfo Port, bool DirectCandidate, string Note);
+public record SwitchSnapshot(SwitchIdentity Identity, IReadOnlyList<PortInfo> Ports, IReadOnlyList<VlanInfo> Vlans);
+public record DetectionObservation(SwitchSnapshot Snapshot, IReadOnlyList<MacEntry> Entries);
+public record ConnectionProfile(string Host = "", int Port = 22, string Username = "", bool Remember = false, string Password = "", string EnablePassword = "")
+{
+    // Never expose record-generated credential dumps in UI fallbacks or diagnostics.
+    public override string ToString() => $"{Host}:{Port}";
+}
+
+public interface ICliSession : IAsyncDisposable
+{
+    bool IsConnected { get; }
+    string Hostname { get; }
+    Task<string> ExecuteAsync(string command, CancellationToken cancellationToken = default);
+}
+public interface ISwitchDriver : IAsyncDisposable
+{
+    bool IsConnected { get; }
+    bool IsDemo { get; }
+    Task<SwitchSnapshot> ReadSnapshotAsync(CancellationToken ct = default);
+    Task<DetectionObservation> ReadDetectionAsync(string mac, CancellationToken ct = default);
+    Task<IReadOnlyList<MacEntry>> ReadMacTableAsync(CancellationToken ct = default);
+    Task<InterfaceCounters> ReadCountersAsync(string port, CancellationToken ct = default);
+    Task<TdrResult> RunTdrAsync(string port, SafetyContext safety, CancellationToken ct = default);
+    Task ApplyAsync(CommandPlan plan, bool dryRun, CancellationToken ct = default);
+    Task<string> ExportAsync(CancellationToken ct = default);
+}
+public record SafetyContext(bool IsFresh, bool ManagementPathKnown, IReadOnlySet<string> ProtectedPorts)
+{
+    public DateTimeOffset ObservedAt { get; init; } = DateTimeOffset.UtcNow;
+    public static SafetyContext Unknown => new(false, false, new HashSet<string>());
+}
+public record AuditEntry(DateTimeOffset Time, string Action, string Result)
+{
+    public string TimeLabel => Time.ToLocalTime().ToString("HH:mm:ss");
+}
+public interface IAuditSink { void Write(string action, string result); }

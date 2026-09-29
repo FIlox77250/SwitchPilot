@@ -1,0 +1,9 @@
+{
+  "CliPayloadChars": 1048575,
+  "CliElapsedMs": 4138.13,
+  "CliAllocatedBytes": 298831952,
+  "DetectionIterations": 10,
+  "DetectionCommands": 60,
+  "DetectionElapsedMs": 611.44,
+  "SimulatedLatencyPerCommandMs": 10
+}
