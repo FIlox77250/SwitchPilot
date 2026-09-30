@@ -15,7 +15,26 @@ try {
         $Account = New-LocalUser -Name $User -Password $Password -AccountNeverExpires
         Add-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-545') -Member $Account
         $Credential = [PSCredential]::new("$env:COMPUTERNAME\$User", $Password)
-        $Process = Start-Process $Exe -ArgumentList '--smoke-test' -WorkingDirectory (Split-Path -Parent $Exe) -Credential $Credential -LoadUserProfile -PassThru
+        # Alternate-credential processes inherit the runner's environment. Restore
+        # this account's folders before .NET extracts the single-file native runtime.
+        $QuotedExe = $Exe.Replace("'", "''")
+        $Bootstrap = @'
+$Sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$Profile = (Get-ItemProperty -LiteralPath ("HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" + $Sid)).ProfileImagePath
+$env:USERPROFILE = $Profile
+$env:APPDATA = Join-Path $Profile 'AppData\Roaming'
+$env:LOCALAPPDATA = Join-Path $Profile 'AppData\Local'
+$env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+$Child = Start-Process -FilePath '__EXE__' -ArgumentList '--smoke-test' -PassThru
+$Child.WaitForExit()
+exit $Child.ExitCode
+'@
+        $Bootstrap = $Bootstrap.Replace('__EXE__', $QuotedExe)
+        $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Bootstrap))
+        $PowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+        $Process = Start-Process $PowerShell -ArgumentList '-NoProfile', '-NonInteractive', '-EncodedCommand', $Encoded -WorkingDirectory (Split-Path -Parent $Exe) -Credential $Credential -LoadUserProfile -PassThru
     } else {
         $Process = Start-Process $Exe -ArgumentList '--smoke-test' -PassThru
     }
@@ -23,7 +42,7 @@ try {
     if (!$Process.WaitForExit(90000)) { throw 'WPF smoke test timed out' }
     if ($Process.ExitCode -ne 0) { throw "WPF smoke test failed (exit $($Process.ExitCode))" }
 } finally {
-    if ($Process -and !$Process.HasExited) { $Process.Kill(); $Process.WaitForExit() }
+    if ($Process -and !$Process.HasExited) { $Process.Kill($true); $Process.WaitForExit() }
     if ($Account) {
         $Profile = Get-CimInstance Win32_UserProfile | Where-Object SID -eq $Account.SID.Value
         $Result = if ($Profile) { Join-Path $Profile.LocalPath 'AppData/Roaming/SwitchPilot/SmokeTest' } else { $null }
