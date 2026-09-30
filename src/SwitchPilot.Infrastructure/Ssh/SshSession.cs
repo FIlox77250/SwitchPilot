@@ -1,6 +1,9 @@
 using SwitchPilot.Infrastructure.Terminal;
 using Renci.SshNet;
+using Renci.SshNet.Common;
+using Renci.SshNet.Messages.Transport;
 using SwitchPilot.Core;
+using System.Text.RegularExpressions;
 
 namespace SwitchPilot.Infrastructure.Ssh;
 
@@ -9,8 +12,17 @@ public sealed class SshSession : TerminalSession
     private readonly SshClient client;
     public override ConnectionKind Kind => ConnectionKind.Ssh;
     private SshSession(SshClient client, ITerminalChannel channel, string enablePassword) : base(channel, enablePassword) => this.client = client;
-    public static bool IsNegotiationFailure(Exception error) => error is Renci.SshNet.Common.SshConnectionException e &&
-        e.DisconnectReason == Renci.SshNet.Messages.Transport.DisconnectReason.KeyExchangeFailed;
+
+    // A negotiation failure is a KEX/cipher/host-key mismatch, not a bad password or a
+    // changed host key. Only those failures justify offering the legacy algorithm retry.
+    public static bool IsNegotiationFailure(Exception error)
+    {
+        if (error is SshConnectionException { DisconnectReason: DisconnectReason.KeyExchangeFailed }) return true;
+        return error is SshException && MentionsNegotiation(error.Message);
+    }
+
+    private static bool MentionsNegotiation(string? message) => !string.IsNullOrEmpty(message) &&
+        Regex.IsMatch(message, "algorithm|cipher|key exchange|no matching|kex", RegexOptions.IgnoreCase);
 
     public static async Task<SshSession> ConnectAsync(ConnectionProfile profile, Func<string, string, bool> trustHost, bool legacyAlgorithms, CancellationToken ct)
     {
@@ -18,7 +30,17 @@ public sealed class SshSession : TerminalSession
         if (string.IsNullOrWhiteSpace(profile.Host) || string.IsNullOrWhiteSpace(profile.Username) || profile.Port is < 1 or > 65535)
             throw new ArgumentException("Adresse du switch, utilisateur et port SSH valide requis.");
         if (profile.EnablePassword.Any(char.IsControl)) throw new ArgumentException("Le mot de passe enable ne doit pas contenir de caractères de contrôle.");
-        var info = new PasswordConnectionInfo(profile.Host.Trim(), profile.Port, profile.Username, profile.Password) { Timeout = TimeSpan.FromSeconds(15) };
+        // PuTTY and OpenSSH accept both "password" and "keyboard-interactive"; many switches
+        // (including Allied Telesis) only advertise keyboard-interactive. Offer both so the
+        // same credentials work everywhere instead of failing on the authentication method.
+        var password = new PasswordAuthenticationMethod(profile.Username, profile.Password);
+        var keyboard = new KeyboardInteractiveAuthenticationMethod(profile.Username);
+        keyboard.AuthenticationPrompt += (_, e) =>
+        {
+            foreach (var prompt in e.Prompts)
+                prompt.Response = Regex.IsMatch(prompt.Request ?? "", "user|login", RegexOptions.IgnoreCase) ? profile.Username : profile.Password;
+        };
+        var info = new ConnectionInfo(profile.Host.Trim(), profile.Port, profile.Username, password, keyboard) { Timeout = TimeSpan.FromSeconds(15) };
         if (!legacyAlgorithms)
         {
             foreach (var key in info.KeyExchangeAlgorithms.Keys.Where(k => k.Contains("sha1")).ToArray()) info.KeyExchangeAlgorithms.Remove(key);

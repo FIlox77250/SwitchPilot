@@ -1,10 +1,10 @@
-# Installer Switch Pilot 1.0.3
+# Installer Switch Pilot 1.0.4
 
 Switch Pilot est portable pour Windows x64. Le runtime .NET/WPF est inclus : aucune installation de runtime n’est nécessaire.
 
 ## Télécharger et lancer
 
-1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.3](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.3). L’archive `SwitchPilot-1.0.3-win-x64.zip` ajoute la documentation et les licences.
+1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.4](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.4). L’archive `SwitchPilot-1.0.4-win-x64.zip` ajoute la documentation et les licences.
 2. Extraire l’archive, si nécessaire, dans un dossier utilisateur, par exemple `Documents\SwitchPilot`.
 3. Vérifier le téléchargement avec `Get-FileHash .\SwitchPilot.exe -Algorithm SHA256` et comparer au fichier de sommes.
 4. Lancer `SwitchPilot.exe` par double-clic, sans « Exécuter en tant qu’administrateur ».

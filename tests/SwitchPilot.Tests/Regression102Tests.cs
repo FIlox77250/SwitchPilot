@@ -42,6 +42,9 @@ public class Regression102Tests
         Assert.True(SshSession.IsNegotiationFailure(new SshConnectionException("", DisconnectReason.KeyExchangeFailed)));
         Assert.False(SshSession.IsNegotiationFailure(new SshAuthenticationException("")));
         Assert.False(SshSession.IsNegotiationFailure(new SshConnectionException("", DisconnectReason.HostKeyNotVerifiable)));
+        Assert.True(SshSession.IsNegotiationFailure(new SshConnectionException("no matching key exchange method found", DisconnectReason.None)));
+        Assert.True(SshSession.IsNegotiationFailure(new SshConnectionException("could not agree on a cipher", DisconnectReason.None)));
+        Assert.False(SshSession.IsNegotiationFailure(new SshConnectionException("Connection reset by peer", DisconnectReason.None)));
     }
     [Fact] public async Task DriverBlocksProtectedAndUncertainWritesBeforeSendingAnything()
     {

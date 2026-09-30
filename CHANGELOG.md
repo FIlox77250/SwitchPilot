@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4 — 30 septembre 2026
+
+- Connexion SSH : l’authentification propose désormais `password` **et** `keyboard-interactive`, comme PuTTY et OpenSSH. Les switchs qui n’annoncent que `keyboard-interactive` (fréquent sur Allied Telesis et les anciens IOS) peuvent se connecter avec les mêmes identifiants.
+- Détection d’incompatibilité élargie : la proposition d’algorithmes hérités se déclenche aussi lorsque la lib SSH signale un désaccord d’algorithme/chiffrement sans code `KeyExchangeFailed`.
+- Diagnostic : les erreurs SSH affichent maintenant le détail renvoyé par la lib (méthode refusée, algorithme manquant, etc.) pour identifier la cause réelle.
+
 ## 1.0.3 — 30 septembre 2026
 
 - Compatibilité multi-constructeurs : sélection du constructeur à la connexion et prise en charge d'Allied Telesis (AlliedWare Plus) — état des ports, VLANs, table MAC, compteurs et modifications access/trunk, en SSH comme en console. Le TDR Cisco reste indisponible sur ces switchs, le contrôle passif s'applique.

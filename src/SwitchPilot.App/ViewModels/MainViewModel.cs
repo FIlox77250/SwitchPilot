@@ -219,12 +219,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     }
     private static string FriendlyError(Exception e) => e switch
     {
-        Renci.SshNet.Common.SshAuthenticationException => "Authentification SSH refusée. Vérifiez les identifiants et les droits IOS.",
-        Renci.SshNet.Common.SshConnectionException => "Connexion SSH refusée ou négociation incompatible. Vérifiez la clé du switch et, pour un ancien IOS, l'option de compatibilité.",
+        Renci.SshNet.Common.SshAuthenticationException => "Authentification SSH refusée. Vérifiez les identifiants et les droits IOS." + Detail(e),
+        Renci.SshNet.Common.SshConnectionException => "Connexion SSH refusée ou négociation incompatible. Vérifiez la clé du switch ; pour un ancien IOS, acceptez la proposition de compatibilité." + Detail(e),
+        Renci.SshNet.Common.SshException => "Connexion SSH impossible." + Detail(e),
         System.Net.Sockets.SocketException => "Switch inaccessible. Vérifiez l'adresse, le routage et le port SSH.",
         _ when e is ArgumentException or InvalidOperationException or NotSupportedException or TimeoutException or FormatException or CliException or IOException => e.Message,
         _ => $"L'opération a échoué ({e.GetType().Name}). Vérifiez la connexion et le journal."
     };
+    private static string Detail(Exception e) => string.IsNullOrWhiteSpace(e.Message) ? "" : " Détail : " + e.Message.Trim();
     private void Connect()
     {
         var dialog = new ConnectionWindow(store.Settings.Profiles);

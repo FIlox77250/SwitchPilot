@@ -1,10 +1,10 @@
-# Switch Pilot 1.0.3
+# Switch Pilot 1.0.4
 
 Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.3/SwitchPilot.exe) · [Release v1.0.3 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.3)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.4/SwitchPilot.exe) · [Release v1.0.4 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.4)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
