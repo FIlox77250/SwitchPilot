@@ -50,7 +50,7 @@ Le message Paramiko « no acceptable ciphers » dans la sortie de l’intégrati
 
 **Aucun lancement de la 1.0.2 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.2 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.2.
 
-La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et une tâche limitée pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
+La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et lance directement le processus avec ce compte et son profil chargé pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
 
 Recette à effectuer sur Windows 11 x64 :
 
