@@ -52,6 +52,36 @@ public class SerialTests
         Assert.Contains("tech\n", terminal.Sent);
         Assert.Contains("test-password\n", terminal.Sent);
     }
+    [Fact] public async Task AlliedSyslogDuringInitDoesNotBreakConnect()
+    {
+        var terminal = new AlliedConsole { AlliedLog = true };
+        await using var session = await SerialSession.ConnectAsync(Profile, default, (_, _) => terminal);
+        Assert.True(session.IsConnected);
+        Assert.Contains("awplus", session.Hostname);
+    }
+    [Fact] public async Task BannerMimicDoesNotLockHostname()
+    {
+        // A fake banner ending in # appears as the first "prompt"; the real prompt (different host)
+        // must still be adopted after PrepareAsync, not permanently rejected.
+        var terminal = new BannerMimic();
+        await using var session = await SerialSession.ConnectAsync(Profile, default, (_, _) => terminal);
+        Assert.True(session.IsConnected);
+        Assert.Equal("awplus", session.Hostname);
+    }
+    private sealed class BannerMimic : ITerminalChannel
+    {
+        // A fake "prompt" (# with another name) arrives first; the real prompt (awplus#) comes
+        // only with the first real command. The conversation must adopt it, not lock.
+        // The initial wake-up Enter is ignored on purpose: the fake is already "awake".
+        private readonly Queue<string> pending = new(["v1.2# "]);
+        public bool IsOpen { get; private set; } = true;
+        public string ReadAvailable() => pending.TryDequeue(out var chunk) ? chunk : "";
+        public void Send(string text)
+        {
+            if (text.StartsWith("terminal")) pending.Enqueue(text.TrimEnd('\n') + "\nawplus#");
+        }
+        public void Dispose() => IsOpen = false;
+    }
     [Fact] public void SerialProfileCannotInjectTerminalControls() => Assert.Throws<ArgumentException>(() => (Profile with { Password = "bad\nreload" }).Validate());
     [Fact] public void SerialProfileStringDoesNotExposeCredentials() => Assert.Equal("Console COM3 · 9600", Profile.ToString());
     private sealed class Emulator(string initial) : ITerminalChannel

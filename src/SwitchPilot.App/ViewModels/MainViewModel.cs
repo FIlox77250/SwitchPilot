@@ -115,7 +115,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public MainViewModel()
     {
-        audit = new(Path.Combine(store.DirectoryPath, "Logs"));
+        var logs = Path.Combine(store.DirectoryPath, "Logs");
+        Directory.CreateDirectory(logs);
+        CliTrace.Configure(logs);
+        audit = new(logs);
         audit.Added += item => dispatcher.Invoke(() => { Journal.Insert(0, item); if (Journal.Count > 500) Journal.RemoveAt(500); });
         PortsView = CollectionViewSource.GetDefaultView(Ports);
         PortsView.Filter = item => item is PortInfo p && (p.Name + " " + p.Description + " " + p.Vlan + " " + p.StateLabel).Contains(Search, StringComparison.OrdinalIgnoreCase);
@@ -396,6 +399,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         disposed = true; timer.Stop(); operation?.Cancel(); lifetime.Cancel();
         Dependencies.Changed -= DependencyChanged; monitor.Changed -= ObservationsChanged;
+        try { CliTrace.Close(); } catch { /* never block shutdown */ }
         await monitor.DisposeAsync(); notifications.Dispose();
         if (driver != null) await driver.DisposeAsync();
     }

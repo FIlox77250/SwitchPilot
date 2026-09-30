@@ -62,6 +62,9 @@ public sealed class SshSession : TerminalSession
             await ssh.ConnectAsync(ct);
             var stream = ssh.CreateShellStream("vt100", 240, 80, 0, 0, 65536);
             session = new(ssh, new ShellChannel(stream, ssh), profile.EnablePassword);
+            // Some switches only print the banner/prompt after a carrier return (PuTTY users
+            // press Enter naturally); send one so InitializeAsync doesn't stall on silence.
+            stream.Write("\r\n"); stream.Flush();
             await session.Conversation.InitializeAsync(ct);
             if (profile.EnablePassword.Length > 0) await session.Conversation.EnsurePrivilegedAsync(profile.EnablePassword, ct);
             return session;

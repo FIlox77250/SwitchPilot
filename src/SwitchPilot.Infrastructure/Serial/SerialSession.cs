@@ -25,6 +25,6 @@ public sealed class SerialSession : TerminalSession
             catch (TimeoutException) when (profile.AutoBaud) { await session.DisposeAsync(); }
             catch { await session.DisposeAsync(); throw; }
         }
-        throw new TimeoutException("Aucun prompt IOS lisible aux vitesses proposées. Vérifiez le câble console et les paramètres du switch.");
+        throw new TimeoutException("Aucune invite CLI lisible aux vitesses proposées. Vérifiez le câble console et les paramètres du switch.");
     }
 }

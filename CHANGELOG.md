@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.7 — 30 septembre 2026
+
+Correctifs ciblés sur le cas « session ouverte mais première commande sans réponse » (timeout après connexion réussie, en SSH comme en console).
+
+- **SSH — Enter initial** : un retour chariot est envoyé à l'ouverture du shell avant la première lecture, comme le fait naturellement un utilisateur PuTTY ; un switch qui n'affiche sa bannière qu'après une touche ne bloque plus l'initialisation.
+- **Console — DTR activé** : `DtrEnable = true` (comme PuTTY) au lieu de `false` ; certains adaptateurs USB-série et UART de switch ne transmettent rien avec DTR bas, ce qui produisait un timeout silencieux. Les tampons sont purgés à l'ouverture.
+- **Console — relance conditionnelle** : un seul Enter initial, puis une unique relance après 1,5 s **uniquement si rien n'est arrivé du tout** (jamais au milieu d'un dialogue, jamais sur une invite visible).
+- **Hostname non verrouillé trop tôt** : une ligne de bannière/MOTD ressemblant à un prompt ne fige plus durablement un mauvais hostname ; le verrouillage n'intervient qu'après le premier aller-retour de commande.
+- **Journal de dialogue CLI** : chaque session écrit `%APPDATA%\SwitchPilot\Logs\console-*.log` (commandes envoyées + réponses reçues, réponses sensibles masquées, 200 Ko max). En cas d'échec persistant, ce fichier montre exactement ce que le switch a répondu.
+- **Libellé COM** : l'absence de prompt série dit « invite CLI » au lieu de « prompt IOS ».
+
 ## 1.0.6 — 30 septembre 2026
 
 Corrections issues d'un audit complet du code (10 analyses parallèles), centrées sur la connexion switch.

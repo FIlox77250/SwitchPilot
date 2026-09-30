@@ -1,17 +1,17 @@
 {
-  "version": "1.0.6",
+  "version": "1.0.7",
   "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
   "regression": {
-    "total": 201,
-    "executed": 184,
-    "passed": 184,
+    "total": 203,
+    "executed": 186,
+    "passed": 186,
     "failed": 0,
     "skipped": 17,
     "timing": {
-      "creation": "2026-09-30T17:52:26.4068526+02:00",
-      "queuing": "2026-09-30T17:52:26.4068526+02:00",
-      "start": "2026-09-30T17:52:25.8683865+02:00",
-      "finish": "2026-09-30T17:52:31.9861156+02:00"
+      "creation": "2026-09-30T18:25:49.1004633+02:00",
+      "queuing": "2026-09-30T18:25:49.1004633+02:00",
+      "start": "2026-09-30T18:25:48.5881863+02:00",
+      "finish": "2026-09-30T18:25:54.6840434+02:00"
     },
     "skipped_tests": [
       "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
@@ -32,15 +32,5 @@
       "SwitchPilot.Tests.Windows102Tests.SkippedUpdateVersionSurvivesDpapiRoundtrip",
       "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
     ]
-  },
-  "integration": {
-    "note": "Tests d'intégration SSH à lancer avec l'émulateur local (tests/ssh_emulator.py) ; non exécutés dans ce run."
-  },
-  "artifact": {
-    "path": "artifacts/win-x64/SwitchPilot.exe",
-    "bytes": 68333237,
-    "sha256": "1be5f4af2422085e56bdf5b5854071f253d0c45d7fa20334ac1ff56968426185",
-    "native_windows_execution": "not run",
-    "hardware_validation": "not run"
   }
 }

@@ -22,15 +22,33 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
             if (RequiresPrivilege(command))
             {
                 await Conversation.EnsurePrivilegedAsync(secret, cancellationToken);
-                return await Conversation.CommandAsync(command, cancellationToken);
+                CliTrace.Line(">", command, mask: false);
+                Conversation.CurrentCommandLogMask = CliTrace.IsSensitive(command) ? command : null;
+                try
+                {
+                    var result = await Conversation.CommandAsync(command, cancellationToken);
+                    CliTrace.Line("<=", CliTrace.IsSensitive(command) ? "" : result, mask: CliTrace.IsSensitive(command));
+                    return result;
+                }
+                finally { Conversation.CurrentCommandLogMask = null; }
             }
-            try { return await Conversation.CommandAsync(command, cancellationToken); }
-            catch (CliException e) when (!Conversation.Privileged && e.Failure == CliFailure.Authorization)
+            try
             {
-                // Some platforms (AlliedWare Plus in particular) only expose certain read
-                // commands to privileged users. Elevate and retry once instead of forcing
-                // "enable" upfront. Only an authorization refusal justifies elevation, and an
+                CliTrace.Line(">", command, mask: false);
+                Conversation.CurrentCommandLogMask = CliTrace.IsSensitive(command) ? command : null;
+                try
+                {
+                    var result = await Conversation.CommandAsync(command, cancellationToken);
+                    CliTrace.Line("<=", CliTrace.IsSensitive(command) ? "" : result, mask: CliTrace.IsSensitive(command));
+                    return result;
+                }
+                finally { Conversation.CurrentCommandLogMask = null; }
+            } catch (CliException e) when (!Conversation.Privileged && e.Failure == CliFailure.Authorization)
+            {
+                // Some platforms only expose certain read commands to privileged users. Elevate
+                // and retry once; only an authorization refusal justifies elevation, and an
                 // impossible elevation keeps the original error instead of masking it.
+                CliTrace.Line("! ", command + " → élévation privilegee", mask: true);
                 try { await Conversation.EnsurePrivilegedAsync(secret, cancellationToken); }
                 catch (CliException) { throw e; }
                 return await Conversation.CommandAsync(command, cancellationToken);

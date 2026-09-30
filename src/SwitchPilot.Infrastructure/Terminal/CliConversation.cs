@@ -24,6 +24,8 @@ public sealed class CliConversation(ITerminalChannel channel)
     public string Hostname { get; private set; } = "";
     public string Prompt { get; private set; } = "";
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(25);
+    /// <summary>When set by the calling session, logs the received chunks of that command (masked).</summary>
+    internal string? CurrentCommandLogMask { get; set; }
     public bool Privileged => Prompt.EndsWith('#');
     private static readonly Regex AnyPrompt = new(@"(?:^|\n)(?<prompt>(?<host>[A-Za-z0-9_.-]+)(?:\([A-Za-z0-9_-]+\))?[>#])\s*$");
     private static readonly Regex Error = new(@"(?im)^[ \t]*(?:%(?![A-Z0-9_]+-\d-[A-Z0-9_]+:)[^\n]+|(?:Command rejected|Not allowed|Command authorization failed|Authorization failed|Access denied|Permission denied|Cannot (?:modify|create|delete)[^\n]*VLAN|(?:VTP|VLAN configuration)[^\n]*(?:client|not allowed)|(?:TDR|Cable diagnostics?)\b[^\n]*(?:not supported|not allowed))[^\n]*)$");
@@ -35,6 +37,9 @@ public sealed class CliConversation(ITerminalChannel channel)
     private static readonly Regex CiscoSyslog = new(@"(?m)^(?:\*?[A-Za-z]{3}\s+\d+[^\r\n%]*:\s*)?%[A-Z0-9_]+-\d-[A-Z0-9_]+:[^\r\n]*(?:\n|$)");
     // AlliedWare Plus logs are timestamped <time> <host> <facility>.<severity> ... with no '%'.
     private static readonly Regex AlliedSyslog = new(@"(?m)^\s*(?:[A-Z][a-z]{2}\s+\d{1,2}\s+)?\d{2}:\d{2}:\d{2}\s+(?:\S+\s+)?[a-z][a-z0-9]*\.(?:emerg|alert|crit|err|error|warning|notice|info|debug)\b[^\r\n]*(?:\n|$)");
+    /// <summary>Lock the hostname after PrepareAsync, once a real command round-trip confirmed the prompt.</summary>
+    private bool hostnameLocked;
+    private void LockHostname() { if (!hostnameLocked) hostnameLocked = true; }
 
     public async Task InitializeAsync(CancellationToken ct)
     {
@@ -46,11 +51,15 @@ public sealed class CliConversation(ITerminalChannel channel)
         if (Prompt.Contains('(')) await CommandAsync("end", ct);
         try { await CommandAsync("terminal length 0", ct); } catch (CliException) { /* --More-- remains supported. */ }
         try { await CommandAsync("terminal width 240", ct); } catch (CliException) { }
+        LockHostname();
     }
     public async Task InitializeConsoleAsync(ConnectionProfile profile, CancellationToken ct)
     {
         profile.Validate();
         ct.ThrowIfCancellationRequested();
+        // A serial console may need a carrier return to print its banner/login prompt.
+        // Exactly one Enter here: a second unconditional one could submit an empty login
+        // on a fast device (see the in-loop nudge in ReceiveAsync for silent devices).
         channel.Send("\n");
         await ReceiveAsync(false, ct, profile);
         await PrepareAsync(ct);
@@ -104,6 +113,7 @@ public sealed class CliConversation(ITerminalChannel channel)
         var tail = "";
         var lastReceive = Stopwatch.StartNew();
         var loginSent = false; var passwordSent = false; var initialAnswered = false; var returnSent = false;
+        var nudged = false;
         while (timer.Elapsed < Timeout)
         {
             ct.ThrowIfCancellationRequested();
@@ -111,6 +121,7 @@ public sealed class CliConversation(ITerminalChannel channel)
             if (chunk.Length > 0)
             {
                 buffer.Append(chunk, () => { ct.ThrowIfCancellationRequested(); channel.Send(" "); });
+                CliTrace.Line("<", chunk, mask: CurrentCommandLogMask is not null);
                 tail = buffer.Tail; lastReceive.Restart();
             }
             // Timestamped and untimestamped asynchronous IOS syslogs are not command output.
@@ -141,8 +152,18 @@ public sealed class CliConversation(ITerminalChannel channel)
                 }
             }
             if (allowPassword && PasswordPrompt.IsMatch(tail)) return buffer.ToString();
+            // A silent device (console needing Enter, SSH banner waiting for a keypress) would
+            // otherwise stall until Timeout. Nudge once, and only while nothing arrived at all:
+            // an empty line at a real prompt is harmless, while a visible partial prompt means
+            // the dialogue already started and must not be disturbed.
+            if (!nudged && tail.Length == 0 && channel.IsOpen && timer.Elapsed > TimeSpan.FromMilliseconds(1500))
+            {
+                ct.ThrowIfCancellationRequested();
+                channel.Send("\n");
+                nudged = true;
+            }
             var match = AnyPrompt.Match(tail);
-            if (match.Success && lastReceive.ElapsedMilliseconds >= 100 && (Hostname.Length == 0 || match.Groups["host"].Value == Hostname))
+            if (match.Success && lastReceive.ElapsedMilliseconds >= 100 && (Hostname.Length == 0 || !hostnameLocked || match.Groups["host"].Value == Hostname))
             {
                 Hostname = match.Groups["host"].Value; Prompt = match.Groups["prompt"].Value;
                 return StripSyslog(buffer.ToString());
