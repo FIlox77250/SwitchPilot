@@ -19,14 +19,28 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
         try
         {
             if (!IsConnected) throw new IOException("Session terminal déconnectée.");
-            if (command is "configure terminal" or "write memory" or "show running-config" or "show vlan brief" || command.StartsWith("test cable-diagnostics") || command.StartsWith("show cable-diagnostics") || command.StartsWith("show mac"))
+            if (RequiresPrivilege(command))
+            {
                 await Conversation.EnsurePrivilegedAsync(secret, cancellationToken);
-            return await Conversation.CommandAsync(command, cancellationToken);
+                return await Conversation.CommandAsync(command, cancellationToken);
+            }
+            try { return await Conversation.CommandAsync(command, cancellationToken); }
+            catch (CliException) when (!Conversation.Privileged)
+            {
+                // Some platforms (AlliedWare Plus in particular) only expose certain read
+                // commands to privileged users. Elevate and retry once instead of forcing
+                // "enable" upfront, which fails when no enable password was provided.
+                await Conversation.EnsurePrivilegedAsync(secret, cancellationToken);
+                return await Conversation.CommandAsync(command, cancellationToken);
+            }
         }
         catch (Exception e) when (e is TimeoutException or OperationCanceledException or IOException)
         { await DisposeAsync(); throw; }
         finally { gate.Release(); }
     }
+    private static bool RequiresPrivilege(string command) =>
+        command is "configure terminal" or "write memory" or "show running-config" or "copy running-config startup-config"
+        || command.StartsWith("test cable-diagnostics") || command.StartsWith("show cable-diagnostics");
     public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return ValueTask.CompletedTask;

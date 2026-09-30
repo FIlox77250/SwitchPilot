@@ -42,7 +42,9 @@ public sealed class AlliedTelesisDriver(ICliSession session, IAuditSink audit, I
         }
         catch (CliException) { audit.Write("Lecture des descriptions", "Descriptions limitées à la sortie interface status."); }
         var vlanOutput = await session.ExecuteAsync("show vlan brief", ct);
-        var vlans = AlliedTelesisParser.Vlans(vlanOutput);
+        IReadOnlyList<VlanInfo> vlans;
+        try { vlans = AlliedTelesisParser.Vlans(vlanOutput); }
+        catch (FormatException) { vlans = []; audit.Write("Lecture des VLAN", "Format « show vlan brief » AlliedWare Plus non reconnu ; liste vide."); }
         var modes = AlliedTelesisParser.PortModes(vlanOutput);
         if (modes.Count > 0) ports = ports.Select(p => p with { Mode = modes.GetValueOrDefault(p.Name, p.Mode) }).ToArray();
         lastSnapshot = new(info, ports, vlans);

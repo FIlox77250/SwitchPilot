@@ -49,7 +49,7 @@ public partial class ConnectionWindow : Window
         if (Profiles.SelectedItem is not ConnectionProfile p || Host is null) return;
         Host.Text = p.Host; Port.Text = p.Port.ToString(); Username.Text = p.Username;
         Password.Password = p.Password; EnablePassword.Password = p.EnablePassword; Remember.IsChecked = p.Remember;
-        Vendor.SelectedIndex = p.Vendor == SwitchVendor.AlliedTelesis ? 1 : 0;
+        Vendor.SelectedIndex = p.AutoDetectVendor ? 0 : p.Vendor == SwitchVendor.AlliedTelesis ? 2 : 1;
         Mode.SelectedIndex = p.Kind == ConnectionKind.Serial ? 1 : 0; desiredPort = p.SerialPort;
         BaudRates.SelectedItem = p.BaudRate; AutoBaud.IsChecked = p.AutoBaud;
         if (SerialPorts.ItemsSource is IEnumerable<SerialDevice> devices) SerialPorts.SelectedItem = devices.FirstOrDefault(d => d.Port == desiredPort);
@@ -58,7 +58,7 @@ public partial class ConnectionWindow : Window
     {
         var serial = Mode.SelectedIndex == 1;
         var profile = new ConnectionProfile(Host.Text.Trim(), int.TryParse(Port.Text, out var port) ? port : 0, Username.Text.Trim(), Remember.IsChecked == true, Password.Password, EnablePassword.Password)
-        { Kind = serial ? ConnectionKind.Serial : ConnectionKind.Ssh, Vendor = Vendor.SelectedIndex == 1 ? SwitchVendor.AlliedTelesis : SwitchVendor.Cisco, SerialPort = (SerialPorts.SelectedItem as SerialDevice)?.Port ?? "", BaudRate = BaudRates.SelectedItem is int baud ? baud : 9600, AutoBaud = AutoBaud.IsChecked == true };
+        { Kind = serial ? ConnectionKind.Serial : ConnectionKind.Ssh, Vendor = Vendor.SelectedIndex == 2 ? SwitchVendor.AlliedTelesis : SwitchVendor.Cisco, AutoDetectVendor = Vendor.SelectedIndex == 0, SerialPort = (SerialPorts.SelectedItem as SerialDevice)?.Port ?? "", BaudRate = BaudRates.SelectedItem is int baud ? baud : 9600, AutoBaud = AutoBaud.IsChecked == true };
         try { profile.Validate(); } catch (ArgumentException ex) { Error.Text = ex.Message; return; }
         Profile = profile; Password.Clear(); EnablePassword.Clear(); DialogResult = true;
     }

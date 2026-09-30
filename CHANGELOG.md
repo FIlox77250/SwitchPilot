@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5 — 30 septembre 2026
+
+- Détection automatique du constructeur à la connexion (`show version`) : le pilote Cisco IOS ou Allied Telesis est choisi sans intervention, en SSH comme en console. Le sélecteur « Détection automatique » est désormais l’option par défaut ; un mauvais choix envoyait les mauvaises commandes et faisait échouer les deux transports de la même façon.
+- Mode privilégié adaptatif : les lectures ne forcent plus `enable` a priori ; l’élévation n’a lieu qu’en cas de refus, et l’absence de mot de passe `enable` ne bloque plus une simple lecture.
+- Lecture Allied tolérante : un format `show vlan brief` inattendu ne fait plus échouer la connexion.
+- Message clarifié : « Connecté, mais la lecture de l’état a échoué : … » distingue un problème de lecture d’un échec d’authentification.
+
 ## 1.0.4 — 30 septembre 2026
 
 - Connexion SSH : l’authentification propose désormais `password` **et** `keyboard-interactive`, comme PuTTY et OpenSSH. Les switchs qui n’annoncent que `keyboard-interactive` (fréquent sur Allied Telesis et les anciens IOS) peuvent se connecter avec les mêmes identifiants.

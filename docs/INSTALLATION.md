@@ -1,10 +1,10 @@
-# Installer Switch Pilot 1.0.4
+# Installer Switch Pilot 1.0.5
 
 Switch Pilot est portable pour Windows x64. Le runtime .NET/WPF est inclus : aucune installation de runtime n’est nécessaire.
 
 ## Télécharger et lancer
 
-1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.4](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.4). L’archive `SwitchPilot-1.0.4-win-x64.zip` ajoute la documentation et les licences.
+1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.5](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.5). L’archive `SwitchPilot-1.0.5-win-x64.zip` ajoute la documentation et les licences.
 2. Extraire l’archive, si nécessaire, dans un dossier utilisateur, par exemple `Documents\SwitchPilot`.
 3. Vérifier le téléchargement avec `Get-FileHash .\SwitchPilot.exe -Algorithm SHA256` et comparer au fichier de sommes.
 4. Lancer `SwitchPilot.exe` par double-clic, sans « Exécuter en tant qu’administrateur ».
@@ -32,7 +32,7 @@ Le port, le VLAN annoncé, la source et l’heure apparaissent dès réception. 
 
 ## Connexion SSH
 
-1. Choisir **Connecter un switch**, puis le **constructeur** (Cisco IOS ou Allied Telesis · AlliedWare Plus) et le mode **SSH**.
+1. Choisir **Connecter un switch**, puis le **type de switch** (« Détection automatique » par défaut) et le mode **SSH**.
 2. Saisir l’adresse, le port, l’utilisateur, le mot de passe et éventuellement le secret `enable`.
 3. Vérifier l’empreinte SSH. Une clé nouvelle ou changée demande une confirmation.
 4. En cas d’incompatibilité de négociation, accepter la proposition « ancien IOS » uniquement pour l’équipement concerné.

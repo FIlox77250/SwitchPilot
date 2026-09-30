@@ -33,6 +33,8 @@ public record ConnectionProfile(string Host = "", int Port = 22, string Username
 {
     public ConnectionKind Kind { get; init; }
     public SwitchVendor Vendor { get; init; } = SwitchVendor.Cisco;
+    /// <summary>When true, the switch family is detected from `show version`; Vendor is only a fallback.</summary>
+    public bool AutoDetectVendor { get; init; } = true;
     public string SerialPort { get; init; } = "";
     public int BaudRate { get; init; } = 9600;
     public bool AutoBaud { get; init; }

@@ -3,8 +3,9 @@
   <StackPanel Margin="32">
     <TextBlock Text="Connecter un switch" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,8"/>
     <TextBlock Text="Cisco IOS ou Allied Telesis · SSH ou connexion console locale" Style="{StaticResource MutedText}" Margin="0,0,0,24"/>
-    <TextBlock Text="Constructeur du switch" Style="{StaticResource Label}"/>
+    <TextBlock Text="Type de switch" Style="{StaticResource Label}"/>
     <ComboBox x:Name="Vendor" SelectedIndex="0">
+      <ComboBoxItem Content="Détection automatique (recommandé)"/>
       <ComboBoxItem Content="Cisco IOS"/>
       <ComboBoxItem Content="Allied Telesis · AlliedWare Plus"/>
     </ComboBox>

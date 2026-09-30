@@ -245,15 +245,34 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 legacy = true;
                 session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, true, ct), ct);
             }
-            driver = selected.Vendor == SwitchVendor.AlliedTelesis
+            var vendor = selected.Vendor;
+            if (selected.AutoDetectVendor)
+            {
+                try
+                {
+                    // Detect from the banner so the wrong driver (Cisco vs Allied) cannot make
+                    // both SSH and console fail with the same wrong read commands.
+                    if (SwitchVendorDetector.Detect(await session.ExecuteAsync("show version", ct)) is { } detected) vendor = detected;
+                }
+                catch (CliException) { /* Fall back to the explicit selection. */ }
+            }
+            driver = vendor == SwitchVendor.AlliedTelesis
                 ? new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath))
                 : new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
             profile = selected with { Password = "", EnablePassword = "" };
             store.SaveProfile(selected);
             selected = selected with { Password = "", EnablePassword = "" };
-            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", legacy ? "Connecté avec compatibilité ancien IOS." : "Connecté.");
+            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité ancien IOS" : "Connecté") + $" · {(vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis" : "Cisco IOS")}.");
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
-            await Refresh(ct); await Detect(ct);
+            try { await Refresh(ct); await Detect(ct); }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // A read failure must not look like a login failure: keep the session open and
+                // state exactly what could not be read so the user can retry or adjust.
+                Model = vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis · AlliedWare Plus" : "Cisco IOS";
+                Connection = session.Hostname + " · connecté";
+                Status = "Connecté, mais la lecture de l'état a échoué : " + FriendlyError(e);
+            }
         });
     }
     private bool Trust(string host, string fingerprint) => dispatcher.Invoke(() =>

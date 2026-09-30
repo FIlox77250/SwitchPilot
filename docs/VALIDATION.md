@@ -1,4 +1,4 @@
-# Validation de Switch Pilot 1.0.4
+# Validation de Switch Pilot 1.0.5
 
 État au 30 septembre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
 
@@ -7,7 +7,7 @@
 Environnement : Linux Ubuntu, SDK .NET 10.0.401, build Release, runtime cible .NET/WPF 10.0.12.
 
 - Compilation de la solution avec `dotnet build SwitchPilot.sln -c Release -warnaserror` : **zéro erreur, zéro avertissement**.
-- Suite locale (Linux, émulateur SSH arrêté) : **174 tests réussis, 17 ignorés, 0 échec, 191 au total**. Les tests ignorés nécessitent Windows (DPAPI, Authenticode) ou l’émulateur SSH local ; aucun n’échoue.
+- Suite locale (Linux, émulateur SSH arrêté) : **178 tests réussis, 17 ignorés, 0 échec, 195 au total**. Les tests ignorés nécessitent Windows (DPAPI, Authenticode) ou l’émulateur SSH local ; aucun n’échoue.
 - Suite avec l’émulateur SSH local lancé : les tests d’intégration SSH complètent la suite précédente. Les exclusions restantes concernent Windows et les consoles PTY selon l’environnement.
 - Publication autonome `win-x64`, single-file compressé, sans trimming. Le fichier produit est un exécutable PE32+ GUI x64 ; le runtime et les dépendances sont embarqués. Les fichiers de documentation accompagnent l’EXE mais ne sont pas nécessaires à son lancement.
 - Analyse NuGet des dépendances de production, transitives comprises : aucune vulnérabilité connue signalée par la source NuGet lors de cette vérification. Ce résultat ne constitue pas un audit de sécurité exhaustif.
@@ -50,7 +50,7 @@ Le message Paramiko « no acceptable ciphers » dans la sortie de l’intégrati
 
 ## Windows : vérifications encore nécessaires
 
-**Aucun lancement de la 1.0.4 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.4 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.4.
+**Aucun lancement de la 1.0.5 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.5 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.5.
 
 La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et lance directement le processus avec ce compte et son profil chargé pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
 
@@ -80,4 +80,4 @@ Aucun switch ni câble console physique n’était disponible. Les fixtures sont
 
 Un seul switch actif à la fois ; aucune exploration récursive. Les annonces ne prouvent pas le port final. Les particularités de teaming/bridging nécessitent une recette dédiée. Un TDR interrompu côté client peut continuer côté switch ; les commandes IOS déjà acceptées ne sont pas annulées automatiquement. Les sauvegardes DPAPI dépendent du compte Windows.
 
-L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.4 sur matériel.
+L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.5 sur matériel.

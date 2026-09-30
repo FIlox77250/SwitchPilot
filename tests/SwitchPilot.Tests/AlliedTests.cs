@@ -37,6 +37,14 @@ public class AlliedTests
         Assert.Equal("port1.0.1", CommandPlan.Interface("1.0.1"));
     }
 
+    [Theory]
+    [InlineData("AlliedWare Plus (AW+) version 5.4.7-1.1\nModel: x230-28GP", SwitchVendor.AlliedTelesis)]
+    [InlineData("Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.2(4)E10", SwitchVendor.Cisco)]
+    [InlineData("Allied Telesis Inc.", SwitchVendor.AlliedTelesis)]
+    [InlineData("something else entirely", null)]
+    public void VendorIsDetectedFromTheBanner(string banner, SwitchVendor? expected) =>
+        Assert.Equal(expected, SwitchVendorDetector.Detect(banner));
+
     [Fact]
     public void AlliedStatusColumnsAreParsed()
     {
