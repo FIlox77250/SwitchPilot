@@ -1,7 +1,8 @@
 using System.Diagnostics;
+using SwitchPilot.Core;
 using System.Text.RegularExpressions;
 
-namespace SwitchPilot.Infrastructure.Ssh;
+namespace SwitchPilot.Infrastructure.Terminal;
 
 public interface ITerminalChannel : IDisposable
 {
@@ -25,15 +26,29 @@ public sealed class CliConversation(ITerminalChannel channel)
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(25);
     public bool Privileged => Prompt.EndsWith('#');
     private static readonly Regex AnyPrompt = new(@"(?:^|\n)(?<prompt>(?<host>[A-Za-z0-9_.-]+)(?:\([A-Za-z0-9_-]+\))?[>#])\s*$");
-    private static readonly Regex Error = new(@"(?im)^\s*(?:%(?![A-Z0-9_]+-\d-[A-Z0-9_]+:)[^\n]+|(?:TDR|Cable diagnostics?)\b[^\n]*(?:not supported|not allowed)[^\n]*)$");
+    private static readonly Regex Error = new(@"(?im)^[ \t]*(?:%(?![A-Z0-9_]+-\d-[A-Z0-9_]+:)[^\n]+|(?:Command rejected|Not allowed|Command authorization failed|Authorization failed|Access denied|Permission denied|Cannot (?:modify|create|delete)[^\n]*VLAN|(?:VTP|VLAN configuration)[^\n]*(?:client|not allowed)|(?:TDR|Cable diagnostics?)\b[^\n]*(?:not supported|not allowed))[^\n]*)$");
     private static readonly Regex PasswordPrompt = new(@"(?i)password:\s*$");
-    private static readonly Regex Confirmation = new(@"(?i)(\[confirm\]|\[yes/no\]|\(y/n\))\s*$");
+    private static readonly Regex Confirmation = new(@"(?i)(\[confirm\]|\[yes/no\]|\(y/n\)):?\s*$");
 
     public async Task InitializeAsync(CancellationToken ct)
     {
         await ReceiveAsync(false, ct);
+        await PrepareAsync(ct);
+    }
+    private async Task PrepareAsync(CancellationToken ct)
+    {
+        if (Prompt.Contains('(')) await CommandAsync("end", ct);
         try { await CommandAsync("terminal length 0", ct); } catch (CliException) { /* --More-- remains supported. */ }
         try { await CommandAsync("terminal width 240", ct); } catch (CliException) { }
+    }
+    public async Task InitializeConsoleAsync(ConnectionProfile profile, CancellationToken ct)
+    {
+        profile.Validate();
+        ct.ThrowIfCancellationRequested();
+        channel.Send("\n");
+        await ReceiveAsync(false, ct, profile);
+        await PrepareAsync(ct);
+        if (profile.EnablePassword.Length > 0) await EnsurePrivilegedAsync(profile.EnablePassword, ct);
     }
     public async Task EnsurePrivilegedAsync(string enablePassword, CancellationToken ct)
     {
@@ -66,7 +81,7 @@ public sealed class CliConversation(ITerminalChannel channel)
         if (error.Success)
         {
             var reason = error.Value;
-            var failure = Regex.IsMatch(reason, "authorization|permission|access denied", RegexOptions.IgnoreCase) ? CliFailure.Authorization :
+            var failure = Regex.IsMatch(reason, "authorization|permission|access denied|not allowed", RegexOptions.IgnoreCase) ? CliFailure.Authorization :
                 Regex.IsMatch(reason, "invalid input|unknown command|unrecognized command|not supported", RegexOptions.IgnoreCase) ? CliFailure.Unsupported : CliFailure.CommandRejected;
             throw new CliException(failure == CliFailure.Authorization ? "Commande refusée par les autorisations IOS." : "Commande refusée par IOS : syntaxe ou fonctionnalité non disponible.", failure);
         }
@@ -75,12 +90,15 @@ public sealed class CliConversation(ITerminalChannel channel)
         if (lines.Count > 0 && lines[0].Trim() == command) lines.RemoveAt(0);
         return string.Join('\n', lines);
     }
-    private async Task<string> ReceiveAsync(bool allowPassword, CancellationToken ct)
+    private static string StripSyslog(string text) => Regex.Replace(text,
+        @"(?m)^(?:\*?[A-Za-z]{3}\s+\d+[^\r\n%]*:\s*)?%[A-Z0-9_]+-\d-[A-Z0-9_]+:[^\r\n]*(?:\n|$)", "");
+    private async Task<string> ReceiveAsync(bool allowPassword, CancellationToken ct, ConnectionProfile? console = null)
     {
         var timer = Stopwatch.StartNew();
         var buffer = new TerminalBuffer();
         var tail = "";
         var lastReceive = Stopwatch.StartNew();
+        var loginSent = false; var passwordSent = false; var initialAnswered = false; var returnSent = false;
         while (timer.Elapsed < Timeout)
         {
             ct.ThrowIfCancellationRequested();
@@ -90,16 +108,41 @@ public sealed class CliConversation(ITerminalChannel channel)
                 buffer.Append(chunk, () => { ct.ThrowIfCancellationRequested(); channel.Send(" "); });
                 tail = buffer.Tail; lastReceive.Restart();
             }
+            // Timestamped and untimestamped asynchronous IOS syslogs are not command output.
+            tail = StripSyslog(tail);
+            if (console is not null)
+            {
+                string? answer = null;
+                if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*Press RETURN to get started[.!]?\s*$") && !returnSent)
+                { answer = "\n"; returnSent = true; }
+                else if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*Would you like to enter the initial configuration dialog\? \[yes/no\]:?\s*$") && !initialAnswered)
+                { answer = "no\n"; initialAnswered = true; }
+                else if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*(?:Username|login):\s*$"))
+                {
+                    if (loginSent || console.Username.Length == 0) throw new CliException("Identifiant console requis ou authentification refusée.", CliFailure.Authorization);
+                    answer = console.Username + "\n"; loginSent = true;
+                }
+                else if (PasswordPrompt.IsMatch(tail))
+                {
+                    if (passwordSent || console.Password.Length == 0) throw new CliException("Mot de passe console requis ou authentification refusée.", CliFailure.Authorization);
+                    answer = console.Password + "\n"; passwordSent = true;
+                }
+                if (answer is not null)
+                {
+                    ct.ThrowIfCancellationRequested(); channel.Send(answer);
+                    buffer = new TerminalBuffer(); tail = ""; continue;
+                }
+            }
             if (allowPassword && PasswordPrompt.IsMatch(tail)) return buffer.ToString();
             var match = AnyPrompt.Match(tail);
             if (match.Success && lastReceive.ElapsedMilliseconds >= 100 && (Hostname.Length == 0 || match.Groups["host"].Value == Hostname))
             {
                 Hostname = match.Groups["host"].Value; Prompt = match.Groups["prompt"].Value;
-                return buffer.ToString();
+                return StripSyslog(buffer.ToString());
             }
             if (Confirmation.IsMatch(tail))
                 throw new CliProtocolException("IOS demande une confirmation interactive inattendue. Session arrêtée ; vérifiez l'état du switch avant de reprendre.");
-            if (!channel.IsOpen && chunk.Length == 0) throw new IOException("La session SSH a été fermée par le switch.");
+            if (!channel.IsOpen && chunk.Length == 0) throw new IOException("La session terminal a été fermée.");
             await Task.Delay(25, ct);
         }
         throw new TimeoutException("Délai de réponse IOS dépassé. Reconnectez-vous pour éviter une désynchronisation des commandes.");

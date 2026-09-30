@@ -7,7 +7,7 @@ dotnet test tests/SwitchPilot.Tests/SwitchPilot.Tests.csproj -c Release --logger
 dotnet publish src/SwitchPilot.App/SwitchPilot.App.csproj -c Release -r "$runtime" --self-contained true \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false \
   --output "artifacts/$runtime"
-cp README.md THIRD-PARTY-NOTICES.md "artifacts/$runtime/"
+cp README.md THIRD-PARTY-NOTICES.md CHANGELOG.md "artifacts/$runtime/"
 cp -R docs "artifacts/$runtime/"
 (cd "artifacts/$runtime" && sha256sum SwitchPilot.exe > SHA256SUMS.txt)
 printf 'Exécutable : artifacts/%s/SwitchPilot.exe\n' "$runtime"

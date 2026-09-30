@@ -11,6 +11,7 @@ import sys
 import threading
 
 import paramiko
+import serial_emulator
 
 FIXTURES = Path(__file__).parent / "SwitchPilot.Tests" / "Fixtures"
 HOST_KEY = paramiko.RSAKey.generate(2048)
@@ -37,9 +38,12 @@ class Server(paramiko.ServerInterface):
         return True
 
 
-def connection(client):
+def connection(client, legacy=False):
     transport = paramiko.Transport(client)
     try:
+        if legacy:
+            options = transport.get_security_options()
+            options.ciphers = ["aes128-cbc"]
         transport.add_server_key(HOST_KEY)
         server = Server()
         transport.start_server(server=server)
@@ -118,21 +122,29 @@ def main():
     listener.bind(("127.0.0.1", 0))
     listener.listen()
 
-    def accept():
+    legacy_listener = socket.socket()
+    legacy_listener.bind(("127.0.0.1", 0))
+    legacy_listener.listen()
+
+    def accept(listener, legacy=False):
         while True:
             try:
                 client, _ = listener.accept()
             except OSError:
                 return
-            threading.Thread(target=connection, args=(client,), daemon=True).start()
+            threading.Thread(target=connection, args=(client, legacy), daemon=True).start()
 
-    threading.Thread(target=accept, daemon=True).start()
-    env = dict(os.environ, SWITCHPILOT_SSH_TEST_PORT=str(listener.getsockname()[1]))
+    threading.Thread(target=accept, args=(listener,), daemon=True).start()
+    threading.Thread(target=accept, args=(legacy_listener, True), daemon=True).start()
+    serial_env, close_serial = serial_emulator.start()
+    env = dict(os.environ, **serial_env, SWITCHPILOT_SSH_TEST_PORT=str(listener.getsockname()[1]), SWITCHPILOT_SSH_LEGACY_PORT=str(legacy_listener.getsockname()[1]))
     try:
         result = subprocess.run([sys.argv[1] if len(sys.argv) > 1 else "dotnet", "test", "tests/SwitchPilot.Tests", "-c", "Release", "--logger", "trx;LogFileName=integration.trx"], env=env)
         return result.returncode
     finally:
         listener.close()
+        legacy_listener.close()
+        close_serial()
 
 
 if __name__ == "__main__":

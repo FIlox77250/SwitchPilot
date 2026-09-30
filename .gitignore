@@ -7,3 +7,5 @@ TestResults/
 *.user
 *.pfx
 *.spbackup
+
+__pycache__/

@@ -3,6 +3,7 @@ using System.Text.Json;
 using SwitchPilot.Core;
 using SwitchPilot.Infrastructure.Cisco;
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 
 var channel = new BenchChannel();
 var cli = new CliConversation(channel);

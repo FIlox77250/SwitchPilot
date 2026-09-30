@@ -32,6 +32,7 @@
         </StackPanel>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="Paramètres" Command="{Binding SettingsCommand}"/>
         <Button Content="À propos" Command="{Binding AboutCommand}"/>
         <Button Content="Démonstration" Command="{Binding DemoCommand}"/>
         <Button Content="Connecter un switch" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}"/>
@@ -61,8 +62,14 @@
               <ColumnDefinition Width="320"/>
             </Grid.ColumnDefinitions>
             <StackPanel Margin="0,0,22,0">
-              <TextBlock Text="Retrouvez votre port." FontSize="30" FontWeight="SemiBold" Margin="0,0,0,8"/>
-              <TextBlock Text="Identifiez le switch et l'interface associés à votre carte Ethernet." Foreground="{StaticResource Muted}" Margin="0,0,0,24"/>
+              <TextBlock Text="Technicien" FontSize="30" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <TextBlock Text="Branchez le câble. Le lien, le port et les mesures s’actualisent automatiquement." Foreground="{StaticResource Muted}" Margin="0,0,0,24"/>
+              <Border Style="{StaticResource Card}" Padding="20">
+                <StackPanel><TextBlock Text="{Binding LinkLabel}" FontSize="17"/>
+                  <TextBlock Text="{Binding CableVerdict}" FontSize="24" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                  <TextBlock Text="{Binding CableDetails}" Style="{StaticResource MutedText}"/>
+                </StackPanel>
+              </Border>
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition/>
@@ -106,10 +113,12 @@
                       <TextBlock Text="{Binding ResultDuplex}" FontSize="22" FontWeight="SemiBold"/>
                     </StackPanel>
                   </UniformGrid>
+                  <TextBlock Text="{Binding ResultOutlet}" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,0"/>
                   <TextBlock Text="{Binding DetectionNote}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,24,0,22"/>
                   <StackPanel Orientation="Horizontal">
                     <Button Content="Détecter mon port" Command="{Binding DetectCommand}" Style="{StaticResource PrimaryButton}"/>
                     <Button Content="Voir le port" Command="{Binding ViewPortCommand}"/>
+                    <Button Content="Copier" Command="{Binding CopyResultCommand}"/>
                   </StackPanel>
                 </StackPanel>
               </Border>
@@ -117,6 +126,8 @@
             <StackPanel Grid.Column="1" Margin="0,5,0,0">
               <Border Style="{StaticResource Card}">
                 <StackPanel>
+                  <TextBlock Text="{Binding Dependencies.Banner}" Style="{StaticResource MutedText}" Margin="0,0,0,12"/>
+                  <Button Content="Installer / vérifier Npcap" Command="{Binding DependenciesCommand}" Margin="0,0,0,16"/>
                   <TextBlock Text="Sans identifiants" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
                   <TextBlock Text="Écoutez les annonces envoyées par votre switch sur le câble Ethernet." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
                   <Button Content="Écouter LLDP / CDP" Command="{Binding CaptureCommand}" Margin="0,0,0,16"/>
@@ -128,9 +139,11 @@
                   <TextBlock Text="Un résultat traçable" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
                   <TextBlock Text="Chaque détection indique sa source. Une MAC vue sur un uplink reste un indice, pas la preuve d'un branchement direct." Foreground="{StaticResource Muted}"/>
                   <Border Height="1" Background="{StaticResource Line}" Margin="0,20"/>
-                  <TextBlock Text="Les numéros des prises murales peuvent être conservés dans les descriptions des ports." Style="{StaticResource MutedText}"/>
+                  <TextBlock Text="Associez les ports aux noms des prises murales dans votre inventaire local." Style="{StaticResource MutedText}"/>
+                  <Button Content="Inventaire des prises" Command="{Binding InventoryCommand}" Margin="0,16,0,0"/>
                 </StackPanel>
               </Border>
+              <Button Content="Comparer à une sauvegarde" Command="{Binding CompareBackupCommand}" Margin="0,0,0,12"/>
               <Button Content="Lire une sauvegarde chiffrée" Command="{Binding OpenBackupCommand}" Margin="0"/>
             </StackPanel>
           </Grid>
@@ -229,6 +242,10 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel>
             <TextBlock Text="Comprendre le lien." FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <Border Style="{StaticResource Card}"><StackPanel>
+              <TextBlock Text="{Binding CableVerdict}" FontSize="22" FontWeight="SemiBold"/>
+              <TextBlock Text="{Binding CableDetails}" Margin="0,12,0,0"/>
+            </StackPanel></Border>
             <ComboBox ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" DisplayMemberPath="Name" Width="260" HorizontalAlignment="Left" IsEnabled="{Binding IsIdle}" AutomationProperties.Name="Port à diagnostiquer"/>
             <Grid>
               <Grid.ColumnDefinitions>
@@ -246,7 +263,7 @@
               <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,8,0,18">
                 <StackPanel>
                   <TextBlock Text="Test de câble TDR" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,18"/>
-                  <TextBlock Text="Le test peut interrompre le lien. Il est bloqué sur le port du poste, les trunks et lorsque le chemin de connexion est incertain." Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
+                  <TextBlock Text="Le test peut interrompre le lien. Le port du poste est protégé en SSH et testable en console locale. Trunks, agrégats et modes inconnus restent bloqués." Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
                   <Button Content="Préparer le test TDR" Command="{Binding TdrCommand}" HorizontalAlignment="Left"/>
                   <TextBlock Text="{Binding TdrNote}" Style="{StaticResource MutedText}" Margin="0,16,0,0"/>
                 </StackPanel>
@@ -262,6 +279,17 @@
                 </DataGrid.Columns>
               </DataGrid>
             </Border>
+            <TextBlock Text="Historique des diagnostics · sélectionnez une ligne pour voir les mesures" FontSize="17" Margin="0,12,0,12"/>
+            <TextBox Text="{Binding HistoryFilter, UpdateSourceTrigger=PropertyChanged}" Tag="Filtrer l’historique par switch ou port"/>
+            <DataGrid ItemsSource="{Binding DiagnosticView}" SelectedItem="{Binding SelectedDiagnostic}" Height="220">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Date" Binding="{Binding TimeLabel}" Width="170"/>
+                <DataGridTextColumn Header="Switch" Binding="{Binding Switch}" Width="160"/>
+                <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="100"/>
+                <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock Text="{Binding SelectedDiagnostic.Details}" Margin="0,12,0,16"/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

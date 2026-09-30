@@ -2,17 +2,19 @@ using SwitchPilot.Core;
 using SwitchPilot.Core.Cisco;
 using SwitchPilot.Core.Diagnostics;
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 using System.Text.RegularExpressions;
 
 namespace SwitchPilot.Infrastructure.Cisco;
 
-public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSpan? tdrPollInterval = null) : ISwitchDriver
+public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSpan? tdrPollInterval = null, IConfigurationBackup? backup = null) : ISwitchDriver
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private SwitchIdentity? identity;
     private SwitchSnapshot? lastSnapshot;
     private bool filteredMacSupported = true;
     private string macCommand = "show mac address-table";
+    public ConnectionKind Kind => session.Kind;
     public bool IsConnected => session.IsConnected;
     public bool IsDemo => false;
     public async Task<SwitchSnapshot> ReadSnapshotAsync(CancellationToken ct = default)
@@ -103,13 +105,14 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
         try { return CiscoParser.Counters(await session.ExecuteAsync($"show interfaces {port}", ct)); }
         finally { gate.Release(); }
     }
-    public async Task ApplyAsync(CommandPlan plan, bool dryRun, CancellationToken ct = default)
+    public async Task ApplyAsync(CommandPlan plan, bool dryRun, CancellationToken ct = default, SafetyContext? safety = null)
     {
         if (dryRun) { audit.Write(plan.Title, "Simulation : aucune commande envoyée."); return; }
         await gate.WaitAsync(ct);
         var completed = 0;
         try
         {
+            SafetyPolicy.RequireSafeChange(plan, safety ?? SafetyContext.Unknown, Kind);
             // Recheck VLAN constraints immediately before writing, including stale UI selections.
             if (plan.Kind is ChangeKind.AccessVlan or ChangeKind.DeleteVlan)
             {
@@ -118,6 +121,12 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
                 if (plan.Kind == ChangeKind.DeleteVlan && snapshot.Ports.Any(p => p.Vlan == plan.Vlan.ToString()))
                     throw new InvalidOperationException("Suppression bloquée : des ports sont encore affectés à ce VLAN.");
             }
+            if (backup is null) throw new InvalidOperationException("Modification bloquée : service de sauvegarde chiffrée indisponible.");
+            var configuration = await session.ExecuteAsync("show running-config", ct);
+            await backup.SaveAsync(session.Hostname, configuration, ct);
+            audit.Write("Sauvegarde avant modification", "Configuration conservée chiffrée avant toute écriture.");
+            // Backups can take time. Revalidate evidence immediately before the first mutation.
+            SafetyPolicy.RequireSafeChange(plan, safety ?? SafetyContext.Unknown, Kind);
             foreach (var command in plan.Commands)
             {
                 var output = await session.ExecuteAsync(command, ct); completed++;
@@ -145,11 +154,11 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
         {
             var snapshot = await Snapshot(ct);
             var info = snapshot.Ports.Single(p => p.Name == port);
-            SafetyPolicy.RequireSafeTdr(info, safety);
+            SafetyPolicy.RequireSafeTdr(info, safety, Kind);
             // Read-only feature probe first. Never launch a test to discover support.
             string previous;
             try { previous = await session.ExecuteAsync($"show cable-diagnostics tdr interface {port}", ct); }
-            catch (CliException) { throw new NotSupportedException("TDR non pris en charge ou non autorisé sur cette interface. Utilisez le contrôle passif."); }
+            catch (CliException e) when (e.Failure == CliFailure.Unsupported) { throw new NotSupportedException("TDR non pris en charge sur cette interface. Utilisez le contrôle passif."); }
             audit.Write($"TDR {port}", "Lancement confirmé ; interruption de lien possible.");
             try
             {
@@ -157,7 +166,7 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
                 if (!started.Contains("TDR test started", StringComparison.OrdinalIgnoreCase))
                     throw new CliException("Le lancement du TDR n'a pas été confirmé.");
             }
-            catch (CliException) { throw new NotSupportedException("IOS a refusé le TDR sur cette interface. Le contrôle passif reste disponible."); }
+            catch (CliException e) when (e.Failure == CliFailure.Unsupported) { throw new NotSupportedException("TDR non pris en charge sur cette interface. Le contrôle passif reste disponible."); }
             var oldStamp = Regex.Match(previous, @"TDR test last run on:\s*([^\r\n]+)").Groups[1].Value;
             var observedPending = false;
             for (var attempt = 0; attempt < 10; attempt++)

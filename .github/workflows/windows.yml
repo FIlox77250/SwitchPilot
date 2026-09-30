@@ -29,10 +29,8 @@ jobs:
       - name: Exercise WPF demonstration and capture screens
         shell: pwsh
         run: |
-          $p = Start-Process ./artifacts/win-x64/SwitchPilot.exe -ArgumentList '--smoke-test' -PassThru
-          if (!$p.WaitForExit(60000)) { $p.Kill(); throw 'WPF smoke test timed out' }
-          if ($p.ExitCode -ne 0) { throw 'WPF smoke test failed' }
-          Copy-Item "$env:APPDATA/SwitchPilot/SmokeTest" ./artifacts/screens -Recurse
+          ./build/smoke-standard-user.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'WPF smoke test failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

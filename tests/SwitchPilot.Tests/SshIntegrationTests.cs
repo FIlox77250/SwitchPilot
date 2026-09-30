@@ -2,6 +2,7 @@ using SwitchPilot.Core;
 using SwitchPilot.Core.Discovery;
 using SwitchPilot.Infrastructure.Cisco;
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 
 namespace SwitchPilot.Tests;
 
@@ -19,7 +20,7 @@ public class SshIntegrationTests
         var sawFingerprint = false;
         await using var session = await SshSession.ConnectAsync(Profile, (_, fingerprint) => { sawFingerprint = fingerprint.Length > 20; return true; }, false, timeout.Token);
         Assert.True(sawFingerprint);
-        await using var driver = new CiscoIosDriver(session, new SafetyTests.TestAudit());
+        await using var driver = new CiscoIosDriver(session, new SafetyTests.TestAudit(), backup: new SafetyTests.TestBackup());
         var snapshot = await driver.ReadSnapshotAsync(timeout.Token);
         Assert.Equal("LAB-SW", snapshot.Identity.Name); Assert.Equal("WS-C2960+24TC-L", snapshot.Identity.Model);
         var macs = await driver.ReadMacTableAsync(timeout.Token);
@@ -37,6 +38,15 @@ public class SshIntegrationTests
         await driver.ApplyAsync(CommandPlan.Describe("Fa0/14", "Test lab"), false, timeout.Token);
         await driver.ApplyAsync(CommandPlan.Save(), false, timeout.Token);
         Assert.Contains("hostname LAB-SW", await driver.ExportAsync(timeout.Token));
+    }
+    [SshIntegrationFact] public async Task LegacyAlgorithmsRequireExplicitRetry()
+    {
+        var legacyProfile = Profile with { Port = int.Parse(Environment.GetEnvironmentVariable("SWITCHPILOT_SSH_LEGACY_PORT")!) };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => SshSession.ConnectAsync(legacyProfile, (_, _) => true, false, timeout.Token));
+        Assert.True(SshSession.IsNegotiationFailure(failure));
+        await using var session = await SshSession.ConnectAsync(legacyProfile, (_, _) => true, true, timeout.Token);
+        Assert.True(session.IsConnected);
     }
     [SshIntegrationFact] public async Task RejectingHostKeyPreventsConnection()
     {

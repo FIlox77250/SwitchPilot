@@ -118,7 +118,7 @@ public static class CiscoParser
         var duplex = Regex.Match(output, @"(Full|Half)[ -]duplex", RegexOptions.IgnoreCase);
         var link = Regex.Match(output, @"(?im)^\S+ is (up|down|administratively down), line protocol is (up|down)");
         var state = !link.Success ? "Inconnu" : link.Groups[1].Value == "up" && link.Groups[2].Value == "up" ? "Actif" : "Inactif";
-        return new(Read("CRC"), Read("collisions"), Read("input errors"), speed.Success ? speed.Groups[1].Value : "Inconnue", duplex.Success ? duplex.Groups[1].Value : "Inconnu", state);
+        return new(Read("CRC"), Read("collisions"), Read("input errors"), speed.Success ? speed.Groups[1].Value : "Inconnue", duplex.Success ? duplex.Groups[1].Value : "Inconnu", state, Read("output errors"));
     }
     public static TdrResult Tdr(string port, string output)
     {
@@ -149,12 +149,5 @@ public static class CiscoParser
         return new(port, pairs.Values.OrderBy(p => p.Pair).ToArray(),
             pairs.Values.Any(p => p.Status.StartsWith("Inconnu")) ? "Résultats partiels : certaines paires ne peuvent pas être interprétées." :
             "Longueurs estimées par le switch, avec la tolérance affichée.");
-    }
-    public static string RedactConfig(string config)
-    {
-        // Remove entire sensitive lines rather than attempt to recognize every Cisco secret format.
-        return string.Join(Environment.NewLine, config.Split('\n').Select(line =>
-            Regex.IsMatch(line, @"\b(secret|password|community|key-string|private-key|pre-shared-key|radius-server key|tacacs-server key|username)\b", RegexOptions.IgnoreCase)
-                ? "! [ligne sensible supprimée]" : line.TrimEnd('\r')));
     }
 }

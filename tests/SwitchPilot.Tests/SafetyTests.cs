@@ -35,22 +35,22 @@ public class SafetyTests
     }
     [Fact] public async Task DryRunNeverContactsSwitch()
     {
-        var session = new FakeSession(); var driver = new CiscoIosDriver(session, new TestAudit());
+        var session = new FakeSession(); var driver = new CiscoIosDriver(session, new TestAudit(), backup: new TestBackup());
         await driver.ApplyAsync(CommandPlan.Enabled("Fa0/1", false), true);
         await driver.ApplyAsync(CommandPlan.Save(), true);
         Assert.Empty(session.Commands);
     }
     [Fact] public async Task PartialFailureStopsAndLeavesConfigMode()
     {
-        var session = new FakeSession { FailOn = "shutdown" }; var driver = new CiscoIosDriver(session, new TestAudit());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => driver.ApplyAsync(CommandPlan.Enabled("Fa0/1", false), false));
-        Assert.Equal(new[] { "configure terminal", "interface Fa0/1", "shutdown", "end" }, session.Commands);
+        var session = new FakeSession { FailOn = "shutdown" }; var driver = new CiscoIosDriver(session, new TestAudit(), backup: new TestBackup());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => driver.ApplyAsync(CommandPlan.Enabled("Fa0/1", false), false, safety: new(true, true, new HashSet<string>())));
+        Assert.Equal(new[] { "show running-config", "configure terminal", "interface Fa0/1", "shutdown", "end" }, session.Commands);
         Assert.DoesNotContain("write memory", session.Commands);
     }
     [Fact] public async Task SaveRequiresAnIosAcknowledgment()
     {
-        var session = new FakeSession(); var driver = new CiscoIosDriver(session, new TestAudit());
-        await Assert.ThrowsAsync<SwitchPilot.Infrastructure.Ssh.CliException>(() => driver.ApplyAsync(CommandPlan.Save(), false));
+        var session = new FakeSession(); var driver = new CiscoIosDriver(session, new TestAudit(), backup: new TestBackup());
+        await Assert.ThrowsAsync<SwitchPilot.Infrastructure.Terminal.CliException>(() => driver.ApplyAsync(CommandPlan.Save(), false));
     }
     internal sealed class FakeSession : ICliSession
     {
@@ -62,5 +62,6 @@ public class SafetyTests
         { Commands.Add(command); if (command == FailOn) throw new InvalidOperationException("Rejected"); return Task.FromResult(""); }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+    internal sealed class TestBackup : IConfigurationBackup { public Task SaveAsync(string hostname, string config, CancellationToken ct) => Task.CompletedTask; }
     internal sealed class TestAudit : IAuditSink { public void Write(string action, string result) { } }
 }

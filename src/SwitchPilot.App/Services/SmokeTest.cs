@@ -38,6 +38,14 @@ internal static class SmokeTest
             if (loaded.Settings.Profiles[0].Password.Length != 0 || loaded.Settings.Profiles[0].EnablePassword.Length != 0)
                 throw new InvalidOperationException("Forgetting saved credentials failed.");
             if (Directory.EnumerateFiles(store.DirectoryPath, "*.tmp").Any()) throw new InvalidOperationException("Temporary encrypted file not cleaned.");
+            _ = System.IO.Ports.SerialPort.GetPortNames(); // Exercise the published runtime-specific assembly.
+            var serialProfile = new ConnectionProfile { Kind = ConnectionKind.Serial, SerialPort = "COM123", BaudRate = 115200, AutoBaud = true };
+            store.SaveProfile(serialProfile);
+            loaded = new UserStore(store.DirectoryPath); loaded.Load();
+            if (loaded.Settings.Profiles[0].Kind != ConnectionKind.Serial || loaded.Settings.Profiles[0].SerialPort != "COM123") throw new InvalidOperationException("Serial profile migration failed.");
+            var settingsWindow = new SettingsWindow(store, model); settingsWindow.Show(); settingsWindow.UpdateLayout(); settingsWindow.Close();
+            var dependenciesWindow = new DependenciesWindow(model.Dependencies); dependenciesWindow.Show(); dependenciesWindow.UpdateLayout(); dependenciesWindow.Close();
+            var inventoryWindow = new InventoryWindow(model); inventoryWindow.Show(); inventoryWindow.UpdateLayout(); inventoryWindow.Close();
             var connection = new ConnectionWindow([new("smoke-switch", 2222, "smoke-user", true, "fake-secret", "fake-enable")]);
             connection.Show(); connection.UpdateLayout();
             if (((TextBox)connection.FindName("Host")).Text != "smoke-switch" || ((PasswordBox)connection.FindName("Password")).Password != "fake-secret")
@@ -75,7 +83,7 @@ internal static class SmokeTest
             model.SelectedPort = model.Ports.First(p => p.Name == "Gi0/2");
             await Confirm(model.TdrCommand, model, "test cable-diagnostics tdr interface Gi0/2");
             if (model.TdrPairs.Count != 4) throw new InvalidOperationException("TDR result table did not refresh.");
-            File.WriteAllText(Path.Combine(directory, "result.txt"), "PASS: WPF startup; demo detection; five tabs; connection form; passive counters; own-port TDR guard; encrypted profile and backup; forget credentials; dry-run; command previews; description apply; VLAN create/delete; four-pair TDR table.\n");
+            File.WriteAllText(Path.Combine(directory, "result.txt"), "PASS: WPF startup; demo detection; five tabs; connection form; serial assembly enumeration; serial profile DPAPI; settings, dependency and inventory views; passive counters; own-port TDR guard; encrypted profile and backup; forget credentials; dry-run; command previews; description apply; VLAN create/delete; four-pair TDR table.\n");
             Application.Current.Shutdown(0);
         }
         catch (Exception e)

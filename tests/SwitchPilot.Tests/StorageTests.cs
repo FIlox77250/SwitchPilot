@@ -29,6 +29,7 @@ public class StorageTests
         {
             var file = Path.Combine(dir, "settings.dpapi"); File.WriteAllBytes(file, [1, 2, 3, 4]);
             Assert.Throws<System.Security.Cryptography.CryptographicException>(() => new UserStore(dir).Load());
+            Assert.Throws<System.Security.Cryptography.CryptographicException>(() => new UserStore(dir).Load());
             Assert.Single(Directory.GetFiles(dir, "*.unreadable")); Assert.Equal(new byte[] { 1, 2, 3, 4 }, File.ReadAllBytes(file));
         }
         finally { Directory.Delete(dir, true); }

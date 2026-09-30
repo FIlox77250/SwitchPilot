@@ -47,7 +47,7 @@ public static class NeighborParser
             }
             switch (type)
             {
-                case 0: return length == 0 && mandatory == 3 && ttl > 0 && chassis.Length > 0 && port.Length > 0 ? new("LLDP", name.Length > 0 ? name : chassis, port, ValidVlan(vlan), ttl, DateTimeOffset.UtcNow) : null;
+                case 0: return length == 0 && mandatory == 3 && ttl >= 0 && chassis.Length > 0 && port.Length > 0 ? new("LLDP", name.Length > 0 ? name : chassis, port, ValidVlan(vlan), ttl, DateTimeOffset.UtcNow) : null;
                 case 1 when length >= 2: chassis = value[0] == 4 ? Convert.ToHexString(value[1..]) : Text(value[1..]); break;
                 case 2 when length >= 2: port = value[0] == 3 ? Convert.ToHexString(value[1..]) : Text(value[1..]); break;
                 case 3 when length == 2: ttl = BinaryPrimitives.ReadUInt16BigEndian(value); break;
@@ -59,7 +59,7 @@ public static class NeighborParser
     }
     private static NeighborAnnouncement? Cdp(ReadOnlySpan<byte> data)
     {
-        if (data.Length < 4 || data[0] is not (1 or 2) || data[1] == 0) return null;
+        if (data.Length < 4 || data[0] is not (1 or 2)) return null;
         var ttl = data[1]; data = data[4..]; string name = "", port = ""; int? vlan = null;
         while (data.Length >= 4)
         {

@@ -35,12 +35,14 @@ public static class NetworkDiscovery
                 socket.Connect(new IPEndPoint(address, 22));
                 if (socket.LocalEndPoint is not IPEndPoint endpoint || !ips.Contains(endpoint.Address)) return false;
                 var code = GetBestRoute(BitConverter.ToUInt32(address.GetAddressBytes()), BitConverter.ToUInt32(endpoint.Address.GetAddressBytes()), out var route);
-                if (code != 0 || route.NextHop != 0 || route.InterfaceIndex != local.GetIPProperties().GetIPv4Properties().Index) return false;
+                if (code != 0 || !IsDirectRoute(route.Type, route.InterfaceIndex, (uint)local.GetIPProperties().GetIPv4Properties().Index)) return false;
             }
             catch (SocketException) { return false; }
         }
         return true;
     }
+
+    public static bool IsDirectRoute(uint type, uint interfaceIndex, uint expectedInterfaceIndex) => type == 3 && interfaceIndex == expectedInterfaceIndex;
 
     [DllImport("iphlpapi.dll", ExactSpelling = true)]
     private static extern uint GetBestRoute(uint destination, uint source, out IpForwardRow route);

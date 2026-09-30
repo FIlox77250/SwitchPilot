@@ -1,6 +1,7 @@
 using SwitchPilot.Core;
 using SwitchPilot.Infrastructure.Cisco;
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 
 namespace SwitchPilot.Tests;
 
@@ -59,6 +60,12 @@ public class DriverTests
         await Assert.ThrowsAsync<NotSupportedException>(() => driver.RunTdrAsync("Gi0/2", Safe));
         Assert.DoesNotContain(s.Commands, c => c.StartsWith("test "));
     }
+    [Fact] public async Task AuthorizationRefusalIsNotUnsupported()
+    {
+        var s = new Session { RejectProbeAuthorization = true }; await using var driver = Driver(s);
+        var error = await Assert.ThrowsAsync<CliException>(() => driver.RunTdrAsync("Gi0/2", Safe));
+        Assert.Equal(CliFailure.Authorization, error.Failure); Assert.DoesNotContain(s.Commands, c => c.StartsWith("test "));
+    }
     [Fact] public async Task OldTdrResultIsNeverAccepted()
     {
         var s = new Session { TdrResponses = new([OldTdr]) }; await using var driver = Driver(s);
@@ -81,7 +88,7 @@ public class DriverTests
     [Fact] public async Task UnacknowledgedTdrLaunchCannotReadOldSuccess()
     {
         var s = new Session { StartAcknowledgement = "No test performed" }; await using var driver = Driver(s);
-        await Assert.ThrowsAsync<NotSupportedException>(() => driver.RunTdrAsync("Gi0/2", Safe));
+        await Assert.ThrowsAsync<CliException>(() => driver.RunTdrAsync("Gi0/2", Safe));
         Assert.Single(s.Commands, c => c.StartsWith("show cable"));
     }
     [Fact] public async Task ActiveVlanCannotBeDeleted()
@@ -96,11 +103,11 @@ public class DriverTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => driver.ApplyAsync(CommandPlan.Access("Fa0/1", 999), false));
         Assert.DoesNotContain("configure terminal", s.Commands);
     }
-    private static CiscoIosDriver Driver(Session s) => new(s, new SafetyTests.TestAudit(), TimeSpan.Zero);
+    private static CiscoIosDriver Driver(Session s) => new(s, new SafetyTests.TestAudit(), TimeSpan.Zero, new SafetyTests.TestBackup());
     private sealed class Session : ICliSession
     {
         public List<string> Commands { get; } = [];
-        public bool RejectFiltered, RejectAuthorization, RejectPortMode, RejectProbe;
+        public bool RejectFiltered, RejectAuthorization, RejectPortMode, RejectProbe, RejectProbeAuthorization;
         public string MacOutput = ParserTests.Fixture("mac-table.txt");
         public string StartAcknowledgement = "TDR test started on interface Gi0/2";
         public Queue<string> TdrResponses = new([OldTdr]);
@@ -117,6 +124,7 @@ public class DriverTests
             }
             if (command.StartsWith("show cable"))
             {
+                if (RejectProbeAuthorization) throw new CliException("Denied", CliFailure.Authorization);
                 if (RejectProbe) throw new CliException("Invalid", CliFailure.Unsupported);
                 return Task.FromResult(TdrResponses.Count > 1 ? TdrResponses.Dequeue() : TdrResponses.Peek());
             }

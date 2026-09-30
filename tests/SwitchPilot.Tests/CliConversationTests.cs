@@ -1,4 +1,5 @@
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 
 namespace SwitchPilot.Tests;
 

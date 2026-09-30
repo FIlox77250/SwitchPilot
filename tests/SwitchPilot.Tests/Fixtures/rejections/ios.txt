@@ -1,0 +1,5 @@
+Command rejected: interface is a member of a port-channel
+Not allowed in this mode
+VTP VLAN configuration not allowed when device is in CLIENT mode.
+Cannot modify VLAN in VTP client mode
+Command authorization failed.

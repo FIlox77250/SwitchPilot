@@ -1,41 +1,61 @@
-# Installer Switch Pilot sur Windows
+# Installer Switch Pilot 1.0.2
 
-Switch Pilot est une application **portable pour Windows x64**. Il n’y a pas d’assistant d’installation : télécharger le fichier puis le lancer suffit. Aucun runtime Python, Java ou .NET n’est nécessaire.
+Switch Pilot est portable pour Windows x64. Le runtime .NET/WPF est inclus : aucune installation de runtime n’est nécessaire.
 
 ## Télécharger et lancer
 
-1. Se connecter au compte GitHub autorisé à consulter ce dépôt privé.
-2. Ouvrir [la version 1.0.1](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.1).
-3. Dans **Assets**, télécharger **SwitchPilot.exe** (environ 65 Mio). [Lien direct vers l’exécutable](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.1/SwitchPilot.exe).
-4. Placer le fichier dans un dossier utilisateur, par exemple `Documents\SwitchPilot`, puis double-cliquer dessus. Les droits administrateur ne sont pas nécessaires pour les fonctions SSH.
-5. Cliquer sur **Démonstration** pour découvrir les écrans sans switch ni identifiants. Les données et modifications de ce mode sont fictives.
+1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.2](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.2). L’archive `SwitchPilot-1.0.2-win-x64.zip` ajoute la documentation et les licences.
+2. Extraire l’archive, si nécessaire, dans un dossier utilisateur, par exemple `Documents\SwitchPilot`.
+3. Vérifier le téléchargement avec `Get-FileHash .\SwitchPilot.exe -Algorithm SHA256` et comparer au fichier de sommes.
+4. Lancer `SwitchPilot.exe` par double-clic, sans « Exécuter en tant qu’administrateur ».
 
-Le fichier **SwitchPilot-1.0.1-win-x64.zip** contient le même exécutable, la documentation, les licences et les informations de build. Extraire l’archive avant de lancer l’application. Les archives **Source code** proposées automatiquement par GitHub contiennent les sources, pas l’exécutable prêt à lancer.
+La cible de recette est Windows 11 x64. L’exécutable est non signé ; les règles de confiance de Windows et de votre organisation restent applicables.
 
-## Connecter un switch
+## Dépendance facultative Npcap
 
-Cliquer sur **Connecter un switch**, saisir l’adresse et les identifiants SSH, puis vérifier l’empreinte de la clé du switch. Choisir la carte Ethernet dans **Mon branchement** et cliquer sur **Détecter mon port**.
+Au premier lancement sans Npcap utilisable, l’application propose **Installer maintenant** ou **Plus tard**. Npcap permet de détecter automatiquement le port du switch sans identifiants.
 
-La simulation est activée par défaut. Les modifications réelles demandent de désactiver la simulation puis de confirmer les commandes affichées. La sauvegarde `write memory` est une action distincte avec confirmation.
+Avec **Installer maintenant**, Switch Pilot télécharge l’installateur officiel depuis `npcap.com`, vérifie sa signature et son éditeur, puis ouvre l’installateur avec une demande UAC. L’application reste sous le compte utilisateur courant. Accepter la licence Npcap et terminer ses écrans :
 
-Les paramètres et les identifiants éventuellement mémorisés sont chiffrés dans `%APPDATA%\SwitchPilot`. Ils ne sont pas enregistrés à côté de l’exécutable. Les sauvegardes chiffrées sont liées au compte Windows.
+- Laisser **WinPcap API-compatible Mode** coché.
+- Laisser **Restrict Npcap driver's Access to Administrators only** décoché pour capturer avec un compte standard.
 
-## LLDP/CDP facultatif
+La présence du pilote, des bibliothèques et du service est revérifiée après l’installation. Si Npcap est prêt, la surveillance démarre sans relancer Switch Pilot. L’installateur temporaire est supprimé après sa fermeture. **Plus tard** permet de continuer ; la proposition revient au prochain démarrage tant que Npcap manque.
 
-La détection sans identifiants nécessite Npcap sur Windows. Sans Npcap, utiliser la détection SSH ; l’application affiche un message explicite. L’installation de Npcap et les droits de capture dépendent de la politique du poste. Npcap n’est pas inclus dans l’exécutable.
+**Paramètres → Dépendances** permet de consulter l’état de Npcap et des adaptateurs console, d’installer ou de vérifier à nouveau. Npcap n’est pas inclus dans l’exécutable ; sa licence reste distincte. Consulter les [conditions officielles](https://npcap.com/#download), notamment pour un déploiement sur plusieurs postes.
 
-## Vérifier le téléchargement
+## Utiliser le mode Technicien
 
-Télécharger également **SHA256SUMS.txt** dans la release. Dans PowerShell, depuis le dossier contenant l’exécutable :
+Brancher un câble Ethernet et consulter l’accueil. L’application suit le lien et ses mesures localement ; avec Npcap, elle écoute les annonces LLDP/CDP sur les cartes Ethernet physiques. Le switch doit émettre ces annonces.
 
-```powershell
-Get-FileHash .\SwitchPilot.exe -Algorithm SHA256
-```
+Le port, le VLAN annoncé, la source et l’heure apparaissent dès réception. Les données périmées sont retirées. **Copier** prépare un résultat pour un ticket. **Inventaire des prises** permet d’associer le port détecté à un nom de prise, puis d’importer ou d’exporter un CSV.
 
-Comparer la valeur au fichier de sommes SHA-256. L’exécutable est non signé : Windows SmartScreen ou l’antivirus peut afficher une alerte. Ne pas désactiver les protections ; vérifier la provenance, le hash et les règles de son organisation.
+## Connexion SSH
 
-## En cas de problème
+1. Choisir **Connecter un switch → SSH**.
+2. Saisir l’adresse, le port, l’utilisateur, le mot de passe et éventuellement le secret `enable`.
+3. Vérifier l’empreinte SSH. Une clé nouvelle ou changée demande une confirmation.
+4. En cas d’incompatibilité de négociation, accepter la proposition « ancien IOS » uniquement pour l’équipement concerné.
 
-Préciser la version de Windows, le message affiché et si le problème survient en démonstration ou avec un switch. Pour un problème SSH, ajouter le modèle et la version IOS. Ne publier aucun mot de passe, secret de configuration ou fichier de paramètres.
+La table MAC du switch connecté complète les annonces et le contrôle passif démarre sur un port identifié sans contradiction. Une route ou une topologie incertaine ne permet pas d’autoriser une modification dangereuse.
 
-Consulter le [rapport de validation](VALIDATION.md) pour distinguer les tests exécutés des vérifications matérielles et Windows encore à effectuer.
+## Connexion console
+
+1. Installer le pilote du câble s’il manque, selon les indications de **Dépendances**.
+2. Brancher le câble console et choisir **Connecter un switch → Console série**.
+3. Choisir le port COM nommé. Les valeurs initiales sont **9600 bauds, 8N1, sans contrôle de flux**.
+4. Adapter la vitesse ou cocher la détection automatique. Renseigner les identifiants uniquement si le switch les demande.
+
+L’indication **Connexion console locale** rappelle l’absence de vérification de clé SSH. Le pilote USB Console Cisco se récupère manuellement avec un compte Cisco sur le site officiel.
+
+## Modifications et diagnostics
+
+La simulation est activée à chaque lancement. Pour modifier réellement un switch, la désactiver puis confirmer l’aperçu des commandes. Une sauvegarde de la running-config est automatiquement chiffrée avant l’écriture. `write memory` reste une action distincte.
+
+Le TDR est manuel par défaut et peut couper le lien. En SSH, le port du poste et les chemins protégés sont bloqués. En console, le port du poste devient testable après avertissement. L’option automatique se trouve dans Paramètres, nécessite une confirmation d’activation et reste sans effet tant que la simulation est active.
+
+Consulter l’historique dans **Diagnostics**, ou **Comparer à une sauvegarde** pour afficher côte à côte une sauvegarde déchiffrée en mémoire et la configuration actuelle.
+
+Les paramètres restent dans `%APPDATA%\SwitchPilot`. Les identifiants mémorisés et les configurations sont protégés par DPAPI pour ce compte Windows.
+
+Pour les incidents et les limites de validation : [annexe dépannage](TROUBLESHOOTING.md) et [rapport de validation](VALIDATION.md).

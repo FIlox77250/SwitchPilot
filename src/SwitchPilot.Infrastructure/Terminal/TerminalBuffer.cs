@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace SwitchPilot.Infrastructure.Ssh;
+namespace SwitchPilot.Infrastructure.Terminal;
 
 // Incremental terminal decoding: work is proportional to bytes received, not transcript size.
 // Keep the transcript only once. Prompt recognition uses a bounded tail.

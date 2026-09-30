@@ -14,6 +14,7 @@ public partial class MainWindow : Window
         {
             if (Environment.GetCommandLineArgs().Contains("--smoke-test")) await Services.SmokeTest.RunAsync(this, model);
             else if (Environment.GetCommandLineArgs().Contains("--demo")) model.DemoCommand.Execute(null);
+            else await model.InitializeAsync();
         };
     }
 }

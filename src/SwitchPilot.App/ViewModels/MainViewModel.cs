@@ -15,24 +15,26 @@ using SwitchPilot.Core.Diagnostics;
 using SwitchPilot.Core.Discovery;
 using SwitchPilot.Infrastructure.Cisco;
 using SwitchPilot.Infrastructure.Discovery;
+using SwitchPilot.Infrastructure.Serial;
 using SwitchPilot.Infrastructure.Ssh;
+using SwitchPilot.Infrastructure.Terminal;
 using SwitchPilot.Infrastructure.Storage;
 
 namespace SwitchPilot.App.ViewModels;
 
-public sealed class MainViewModel : ObservableObject, IAsyncDisposable
+public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly UserStore store = new();
     private readonly AuditLog audit;
     private readonly Dispatcher dispatcher = Application.Current.Dispatcher;
-    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CancellationTokenSource? operation;
     private ISwitchDriver? driver;
     private ConnectionProfile? profile;
     private SwitchSnapshot? snapshot;
     private bool disposed;
     private DateTimeOffset lastDetection;
-    private NeighborAnnouncement? neighbor;
+    private readonly DetectionSchedule detectionSchedule = new();
     private bool busy, dryRun = true;
     private string status = "Prêt. Connectez un switch ou explorez la démonstration.", connection = "Aucun switch connecté", search = "";
     private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH · Cisco IOS", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
@@ -74,7 +76,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string Description { get => description; set => Set(ref description, value); }
     public string NativeVlan { get => nativeVlan; set => Set(ref nativeVlan, value); }
     public string AllowedVlans { get => allowedVlans; set => Set(ref allowedVlans, value); }
-    public LocalAdapter? Adapter { get => adapter; set { if (Set(ref adapter, value)) ClearDetection(); } }
+    public LocalAdapter? Adapter { get => adapter; set => SelectAdapter(value); }
     public PortInfo? SelectedPort
     {
         get => selectedPort;
@@ -83,6 +85,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string SelectedPortLabel => SelectedPort is null ? "Sélectionnez un port" : $"{SelectedPort.Name} · {SelectedPort.StateLabel}";
     public VlanInfo? SelectedVlan { get => selectedVlan; set { if (Set(ref selectedVlan, value) && value != null) { VlanId = value.Id.ToString(); VlanName = value.Name; } } }
     public string PortCount => $"{Ports.Count(p => p.IsUp)} actifs / {Ports.Count} ports";
+    public DependenciesViewModel Dependencies { get; } = new();
+    public ICommand DependenciesCommand { get; }
     public ICommand ConnectCommand { get; }
     public ICommand DemoCommand { get; }
     public ICommand DisconnectCommand { get; }
@@ -112,6 +116,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         audit.Added += item => dispatcher.Invoke(() => { Journal.Insert(0, item); if (Journal.Count > 500) Journal.RemoveAt(500); });
         PortsView = CollectionViewSource.GetDefaultView(Ports);
         PortsView.Filter = item => item is PortInfo p && (p.Name + " " + p.Description + " " + p.Vlan + " " + p.StateLabel).Contains(Search, StringComparison.OrdinalIgnoreCase);
+        DependenciesCommand = new RelayCommand(() =>
+        {
+            var existing = Application.Current.Windows.OfType<DependenciesWindow>().FirstOrDefault();
+            if (existing != null) existing.Activate(); else new DependenciesWindow(Dependencies).Show();
+        });
         ConnectCommand = new RelayCommand(Connect, () => !IsBusy);
         DemoCommand = new RelayCommand(() => Run("Démonstration", StartDemo), () => !IsBusy);
         DisconnectCommand = new RelayCommand(() => Run("Déconnexion", async _ => await Disconnect()), () => !IsBusy && driver != null);
@@ -145,9 +154,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             Dialogs.ShowText("À propos · Licences", text.ToString());
         }, () => !IsBusy);
         try { store.Load(); } catch { Status = "Paramètres chiffrés illisibles pour ce compte Windows. Le fichier est conservé ; connectez-vous manuellement."; }
+        detectionSchedule.Interval = TimeSpan.FromSeconds(store.Settings.DetectionIntervalSeconds);
+        InitializeHistory(); InitializeExtras();
         RefreshAdapters();
-        NetworkChange.NetworkAddressChanged += NetworkChanged;
+        monitor.Changed += ObservationsChanged;
+        Dependencies.Changed += DependencyChanged;
         timer.Tick += Tick; timer.Start();
+    }
+    public async Task InitializeAsync()
+    {
+        monitor.Start();
+        await Dependencies.CheckAsync();
+        if (Dependencies.Status.OfferInstall) DependenciesCommand.Execute(null);
     }
     private bool CanRead() => !IsBusy && Connected;
     private bool CanEditPort() => CanRead() && SelectedPort != null;
@@ -156,7 +174,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var plan = build();
         if (!Dialogs.Preview(plan, DryRun)) return;
-        await driver!.ApplyAsync(plan, DryRun, ct);
+        var safety = DryRun || plan.Kind is not (ChangeKind.DisablePort or ChangeKind.AccessVlan or ChangeKind.Trunk) ? SafetyContext.Unknown : await Safety(ct);
+        await driver!.ApplyAsync(plan, DryRun, ct, safety);
         if (!DryRun) { await Refresh(ct); ClearDetection(); }
         Status = DryRun ? "Simulation terminée : aucune modification envoyée." : "Commandes appliquées ; état relu. Consultez les ports et VLAN pour vérifier le résultat.";
     }), can);
@@ -199,15 +218,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var dialog = new ConnectionWindow(store.Settings.Profiles);
         if (dialog.ShowDialog() != true || dialog.Profile is null) return;
         var selected = dialog.Profile; var legacy = dialog.LegacyAlgorithms;
-        Run("Connexion SSH", async ct =>
+        Run(selected.Kind == ConnectionKind.Serial ? "Connexion console" : "Connexion SSH", async ct =>
         {
-            await Disconnect();
-            var session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, legacy, ct), ct);
-            driver = new CiscoIosDriver(session, audit);
+            await Disconnect(); monitor.EnableCapture(Dependencies.Available);
+            ICliSession session;
+            try { session = selected.Kind == ConnectionKind.Serial
+                ? await Task.Run(() => SerialSession.ConnectAsync(selected, ct), ct)
+                : await Task.Run(() => SshSession.ConnectAsync(selected, Trust, legacy, ct), ct); }
+            catch (Exception e) when (!legacy && SshSession.IsNegotiationFailure(e))
+            {
+                if (!Dialogs.Confirm("La négociation SSH moderne a échoué. Réessayer avec les algorithmes hérités pour un ancien IOS ? La clé du switch restera vérifiée.", "Compatibilité ancien IOS")) return;
+                legacy = true;
+                session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, true, ct), ct);
+            }
+            driver = new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
             profile = selected with { Password = "", EnablePassword = "" };
             store.SaveProfile(selected);
             selected = selected with { Password = "", EnablePassword = "" };
-            audit.Write("Connexion SSH", legacy ? "Connecté avec compatibilité ancien IOS." : "Connecté.");
+            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", legacy ? "Connecté avec compatibilité ancien IOS." : "Connecté.");
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
             await Refresh(ct); await Detect(ct);
         });
@@ -223,7 +251,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     });
     private async Task StartDemo(CancellationToken ct)
     {
-        await Disconnect(); driver = new DemoSwitchDriver(audit);
+        await Disconnect(); monitor.EnableCapture(false); driver = new DemoSwitchDriver(audit);
         Adapters.Clear(); Adapters.Add(new("demo", "Ethernet de démonstration", "001122334455", true, 100000000, "192.168.10.42")); Adapter = Adapters[0];
         Raise(nameof(IsDemo)); Raise(nameof(Connected)); await Refresh(ct); await Detect(ct);
         Status = "Démonstration active : données fictives, aucune connexion réseau.";
@@ -231,7 +259,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private async Task Disconnect()
     {
         if (driver != null) await driver.DisposeAsync();
+        switchMeasurement = previousSwitchMeasurement = null; measuredSwitch = ""; measuredAdapter = ""; measuredGeneration = -1;
         driver = null; profile = null; snapshot = null; Ports.Clear(); Vlans.Clear(); TdrPairs.Clear(); SelectedPort = null; SelectedVlan = null;
+        monitor.EnableCapture(Dependencies.Available);
         Connection = "Aucun switch connecté"; Model = "SSH · Cisco IOS"; ClearDetection(); RefreshAdapters();
         Raise(nameof(IsDemo)); Raise(nameof(Connected)); Raise(nameof(PortCount)); Status = "Déconnecté.";
     }
@@ -242,52 +272,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Ports.Clear(); foreach (var p in snapshot.Ports) Ports.Add(p);
         Vlans.Clear(); foreach (var v in snapshot.Vlans) Vlans.Add(v);
         SelectedPort = Ports.FirstOrDefault(p => p.Name == selected);
-        Connection = snapshot.Identity.Name + (IsDemo ? " · Démonstration" : " · Connecté");
+        Connection = snapshot.Identity.Name + (IsDemo ? " · Démonstration" : driver.Kind == ConnectionKind.Serial ? " · Connexion console locale" : " · Connecté en SSH");
         Model = snapshot.Identity.Model + " · IOS " + snapshot.Identity.IosVersion;
         Raise(nameof(PortCount)); Status = "État des ports et VLAN actualisé.";
-    }
-    private async Task Detect(CancellationToken ct)
-    {
-        if (Adapter == null) { ClearDetection(); Status = "Aucune carte Ethernet physique disponible."; return; }
-        if (!IsDemo)
-        {
-            var current = NetworkDiscovery.Adapters().FirstOrDefault(a => a.Id == Adapter.Id);
-            if (current is null || !current.IsUp) { ClearDetection(); Status = "La carte Ethernet sélectionnée est débranchée."; return; }
-            if (current.Mac != Adapter.Mac) { RefreshAdapters(); ClearDetection(); return; }
-        }
-        var observation = await driver!.ReadDetectionAsync(Adapter.Mac, ct);
-        var entries = observation.Entries;
-        if (!IsDemo && !NetworkDiscovery.Adapters().Any(a => a.Id == Adapter.Id && a.Mac == Adapter.Mac && a.IsUp))
-        { ClearDetection(); Status = "Le lien a changé pendant la détection. Relancez la recherche."; return; }
-        var results = PortLocator.Find(Adapter.Mac, observation.Snapshot, entries);
-        ClearDetection();
-        if (results.Count == 0) { DetectionNote = "MAC absente de ce switch. Le poste doit émettre du trafic dans le VLAN ; essayez un autre switch du profil. Un routeur masque la MAC du poste."; Status = "MAC non trouvée sur ce switch."; return; }
-        if (results.Count != 1) { DetectionNote = "Plusieurs correspondances : " + string.Join(", ", results.Select(r => $"{r.Entry.Port} / VLAN {r.Entry.Vlan}")) + ". Aucun port unique confirmé."; Status = "Détection ambiguë."; return; }
-        var result = results[0]; lastDetection = DateTimeOffset.UtcNow;
-        ResultSwitch = result.SwitchName; ResultPort = result.Port.Name; ResultVlan = result.Entry.Vlan.ToString(); ResultSpeed = result.Port.SpeedLabel; ResultDuplex = result.Port.DuplexLabel;
-        DetectionNote = result.Note; Source = $"{(IsDemo ? "Démonstration" : "Table MAC SSH")} · {DateTime.Now:HH:mm:ss}";
-        PassiveNote = SafetyPolicy.SpeedAssessment(result.Port);
-        var summary = $"{ResultSwitch}, {ResultPort}, VLAN {ResultVlan}, {ResultSpeed} {ResultDuplex}";
-        if (summary != detectionSummary) { audit.Write("Détection du port", summary); detectionSummary = summary; }
-        Status = summary;
-    }
-    private async Task Capture(CancellationToken ct)
-    {
-        ClearDetection(); CaptureNote = "Écoute sur la carte sélectionnée pendant 65 secondes maximum…";
-        try
-        {
-            neighbor = await NeighborCapture.ListenAsync(Adapter!, TimeSpan.FromSeconds(65), ct);
-            ResultSwitch = neighbor.SwitchName; ResultPort = neighbor.Port; ResultVlan = neighbor.Vlan?.ToString() ?? "Non annoncé";
-            Source = neighbor.Protocol + $" · {neighbor.ReceivedAt.ToLocalTime():HH:mm:ss}";
-            DetectionNote = "Annonce reçue localement, non authentifiée. Le VLAN annoncé peut être le VLAN natif ; vitesse et duplex non déduits.";
-            CaptureNote = $"Annonce {neighbor.Protocol} reçue, valable {neighbor.TtlSeconds} s."; Status = "Voisin découvert sans identifiants SSH.";
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            CaptureNote = FriendlyError(e);
-            if (Connected) { await Detect(ct); Status = CaptureNote + " Détection SSH effectuée."; }
-            else Status = CaptureNote;
-        }
     }
     private async Task Passive(CancellationToken ct)
     {
@@ -297,33 +284,41 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         PassiveNote = (reading.LinkState == "Inconnu" ? "État du lien non reconnu." : SafetyPolicy.SpeedAssessment(measured)) + " Les compteurs sont cumulatifs depuis leur dernière remise à zéro.";
         if (reading.Crc > 0 || reading.Collisions > 0) PassiveNote += " Des erreurs sont présentes : contrôlez leur progression et les deux extrémités.";
         Status = $"Contrôle passif de {port.Name} terminé."; audit.Write("Contrôle passif " + port.Name, "Compteurs lus.");
+        if (!IsDemo) SaveDiagnostic(new(DateTimeOffset.UtcNow, snapshot!.Identity.Name, port.Name, "À vérifier", Counters + "\n" + PassiveNote + "\nRelevé unique : progression des erreurs non mesurée.", Remote: new(port.Name, DateTimeOffset.UtcNow, reading)));
     }
     private async Task<SafetyContext> Safety(CancellationToken ct)
     {
+        if (driver?.Kind == ConnectionKind.Serial) return new(true, true, new HashSet<string>());
         if (IsDemo) return new(true, true, new HashSet<string> { "Fa0/14", "Gi0/1" });
-        if (Adapter == null || profile == null || !await NetworkDiscovery.RoutesViaAsync(profile.Host, Adapter, ct)) return SafetyContext.Unknown;
+        var selected = Adapter; var generation = CurrentGeneration; var observedAt = DateTimeOffset.UtcNow;
+        if (selected == null || profile == null || !await NetworkDiscovery.RoutesViaAsync(profile.Host, selected, ct)) return SafetyContext.Unknown;
         var fresh = await driver!.ReadSnapshotAsync(ct); var entries = await driver.ReadMacTableAsync(ct);
-        var candidates = PortLocator.Find(Adapter.Mac, fresh, entries);
+        bool StillCurrent() => !disposed && Adapter?.Id == selected.Id && Adapter.IsUp && CurrentGeneration == generation;
+        if (!StillCurrent()) return SafetyContext.Unknown;
+        var candidates = PortLocator.Find(selected.Mac, fresh, entries);
         var localMacs = NetworkDiscovery.Adapters().Select(a => a.Mac).ToHashSet();
         var protectedPorts = entries.Where(e => localMacs.Contains(e.Mac)).Select(e => e.Port).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var port in fresh.Ports.Where(p => p.IsTrunk || p.Name.StartsWith("Po"))) protectedPorts.Add(port.Name);
-        return new(true, candidates.Count == 1 && candidates[0].DirectCandidate, protectedPorts);
+        return new(true, candidates.Count == 1 && candidates[0].DirectCandidate, protectedPorts) { ObservedAt = observedAt, StillCurrent = StillCurrent };
     }
     private async Task Tdr(CancellationToken ct)
     {
         var port = SelectedPort!;
-        var safety = await Safety(ct); SafetyPolicy.RequireSafeTdr(port, safety);
+        var safety = await Safety(ct); SafetyPolicy.RequireSafeTdr(port, safety, driver!.Kind);
         var commands = $"test cable-diagnostics tdr interface {port.Name}\nshow cable-diagnostics tdr interface {port.Name}";
         var warning = DryRun ? "Simulation : les commandes seront affichées et aucune ne sera envoyée." :
-            "Ce test peut couper brièvement le lien du port et perturber l'équipement connecté. Le port du poste est protégé. Confirmez l'interruption du port sélectionné.";
+            driver!.Kind == ConnectionKind.Serial ? "Ce test coupera le lien Ethernet du poste quelques secondes si vous testez son port. La console locale restera disponible." : "Ce test peut couper brièvement le lien du port. Le port du poste est protégé en SSH. Confirmez l’interruption du port sélectionné.";
         if (!Dialogs.PreviewText($"Test TDR · {port.Name}", commands, warning, DryRun ? "Simuler le test" : "Lancer le test")) return;
         TdrPairs.Clear();
         if (DryRun) { TdrNote = "Simulation : aucun test lancé."; Status = TdrNote; audit.Write("TDR " + port.Name, TdrNote); return; }
         // Revalidate after the confirmation: the dialog may have remained open for a long time.
         safety = await Safety(ct);
-        var result = await driver!.RunTdrAsync(port.Name, safety, ct);
+        expectedInterruptionUntil = DateTimeOffset.UtcNow.AddMinutes(1);
+        TdrResult result;
+        try { result = await driver!.RunTdrAsync(port.Name, safety, ct); }
+        finally { expectedInterruptionUntil = DateTimeOffset.UtcNow.AddSeconds(15); if (!IsDemo) { monitor.Redetect(); ClearDetection(); detectionSchedule.Request(); } }
         foreach (var pair in result.Pairs) TdrPairs.Add(pair);
-        TdrNote = result.Note; Status = "Résultats TDR reçus.";
+        TdrNote = result.Note; Status = "Résultats TDR reçus."; RecordTdr(snapshot!.Identity.Name, result);
     }
     private async Task Export(CancellationToken ct)
     {
@@ -347,27 +342,11 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         Adapters.Clear(); foreach (var a in NetworkDiscovery.Adapters()) Adapters.Add(a);
         Adapter = Adapters.FirstOrDefault(a => a.Id == selected) ?? Adapters.FirstOrDefault();
     }
-    private void ClearDetection()
-    {
-        neighbor = null; lastDetection = default;
-        ResultSwitch = "Votre point de connexion"; ResultPort = "—"; ResultVlan = "—"; ResultSpeed = "—"; ResultDuplex = "—";
-        Source = "Aucune détection actuelle"; DetectionNote = "Lancez une détection sur la carte Ethernet sélectionnée.";
-    }
-    private void NetworkChanged(object? sender, EventArgs e) => dispatcher.BeginInvoke(() =>
-    {
-        if (disposed || IsDemo) return;
-        ClearDetection();
-        if (!IsBusy) { RefreshAdapters(); if (Connected) Run("Détection après changement réseau", Detect); }
-    });
-    private void Tick(object? sender, EventArgs e)
-    {
-        if (disposed || IsBusy || IsDemo) return;
-        if (neighbor != null && DateTimeOffset.UtcNow - neighbor.ReceivedAt > TimeSpan.FromSeconds(neighbor.TtlSeconds)) { ClearDetection(); CaptureNote = "Annonce LLDP/CDP expirée. Relancez l'écoute."; }
-        if (Connected && snapshot != null && Adapter != null && neighbor == null) Run("Détection automatique", Detect);
-    }
     public async ValueTask DisposeAsync()
     {
-        disposed = true; timer.Stop(); NetworkChange.NetworkAddressChanged -= NetworkChanged; operation?.Cancel();
+        disposed = true; timer.Stop(); operation?.Cancel(); lifetime.Cancel();
+        Dependencies.Changed -= DependencyChanged; monitor.Changed -= ObservationsChanged;
+        await monitor.DisposeAsync(); notifications.Dispose();
         if (driver != null) await driver.DisposeAsync();
     }
 }

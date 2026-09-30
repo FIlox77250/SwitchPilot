@@ -1,0 +1,21 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="SwitchPilot.App.Views.DependenciesWindow" Title="Dépendances" Width="610" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <StackPanel Margin="30">
+    <TextBlock Text="Détection automatique" FontSize="25" FontWeight="SemiBold" Margin="0,0,0,12"/>
+    <TextBlock Text="Npcap permet de détecter automatiquement le port du switch sans identifiants." Margin="0,0,0,20"/>
+    <TextBlock Text="{Binding Status.Label}" FontWeight="SemiBold" Margin="0,0,0,16"/>
+    <TextBlock Text="L’installateur officiel s’ouvrira avec une demande UAC. Laissez « WinPcap API-compatible Mode » coché et « Administrators only » décoché. Vous acceptez la licence dans l’installateur Npcap." Style="{StaticResource MutedText}" Margin="0,0,0,16"/>
+    <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding Indeterminate}" Height="4" Margin="0,0,0,16"/>
+    <TextBlock Text="{Binding Message}" Margin="0,0,0,16"/>
+    <WrapPanel>
+      <Button Content="Installer maintenant" Command="{Binding InstallCommand}" Style="{StaticResource PrimaryButton}"/>
+      <Button Content="Vérifier à nouveau" Command="{Binding CheckCommand}"/>
+      <Button Content="Annuler" Command="{Binding CancelCommand}"/>
+    </WrapPanel>
+    <TextBlock Text="Pilotes console" FontWeight="SemiBold" Margin="0,20,0,8"/>
+    <TextBlock Text="{Binding SerialDrivers}" Style="{StaticResource MutedText}"/>
+    <WrapPanel Margin="0,16,0,0">
+      <Button Content="Installation manuelle · npcap.com" Command="{Binding ManualCommand}"/>
+      <Button Content="Plus tard / Fermer" Click="CloseWindow"/>
+    </WrapPanel>
+  </StackPanel>
+</Window>

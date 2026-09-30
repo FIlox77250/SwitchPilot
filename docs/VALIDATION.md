@@ -1,69 +1,81 @@
-# Validation de Switch Pilot 1.0.1
+# Validation de Switch Pilot 1.0.2
 
-État au 30 septembre 2026. Ce rapport distingue les tests réellement exécutés des validations matérielles restant à effectuer.
+État au 30 septembre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
 
-Les compteurs issus des rapports TRX sont archivés dans [test-results.json](test-results.json).
+## Vérifications exécutées
 
-## Exécuté dans l'environnement de développement
+Environnement : Linux Ubuntu, SDK .NET 10.0.401, build Release, runtime cible .NET/WPF 10.0.12.
 
-- Compilation Release de la solution, sans erreur ni avertissement (`-warnaserror`), avec SDK .NET 10.0.401 sous Ubuntu 24.04.
-- Publication autonome Windows x64, runtime .NET / WPF 10.0.12, format PE32+ GUI. Le fichier final n'a besoin d'aucune DLL applicative à côté de lui.
-- **95 tests réussis, 3 tests ignorés** lors du passage avec l'émulateur SSH local. Les trois tests ignorés sont explicitement réservés à DPAPI sous Windows natif. Sans l’émulateur SSH, sept tests supplémentaires sont ignorés (88 réussis, 10 ignorés).
-- Parmi ces tests : vrais échanges SSH.NET avec un serveur Paramiko éphémère sur loopback, vérification de clé, refus d'une clé non approuvée, refus d'un mauvais mot de passe, `enable`, commandes en mode configuration, recherche MAC, compteurs et export en mémoire.
-- Tests des sorties CLI et des commandes : noms Catalyst 2960+, descriptions longues, interfaces abrégées et longues, MAC, VLANs, TDR, pagination fragmentée, modes user/privileged/config/interface, refus IOS, attente bornée, annulation, injection, dry-run sans contact avec le switch, arrêt après échec partiel et absence de sauvegarde implicite.
-- Régressions ajoutées : annulation avant toute émission, fermeture de session après confirmation imprévue, réponses trop volumineuses, sérialisation concurrente SSH, refus du mauvais secret enable, absence de repli après refus d’autorisation, fraîcheur du mode access/trunk et des résultats TDR, âge du contexte de sécurité, paires manquantes/inconnues/dupliquées, rotation du journal et panne disque.
-- Tests LLDP/CDP : informations annoncées, tags VLAN, troncatures et 5 000 paquets aléatoires sans lecture hors limites.
-- Analyse NuGet des dépendances de production, y compris transitives : aucune vulnérabilité connue signalée par la source NuGet au moment de l'analyse.
+- Compilation de la solution avec `dotnet build SwitchPilot.sln -c Release -warnaserror` : **zéro erreur, zéro avertissement**.
+- Suite avec émulateurs : **156 tests réussis, 6 ignorés, 0 échec, 162 au total**. Les six tests ignorés nécessitent Windows (DPAPI et Authenticode).
+- Suite sans émulateurs : **146 tests réussis, 16 ignorés, 0 échec, 162 au total**. Les dix exclusions supplémentaires concernent huit tests SSH et deux tests série PTY.
+- Publication autonome `win-x64`, single-file compressé, sans trimming. Le fichier produit est un exécutable PE32+ GUI x64 ; le runtime et les dépendances sont embarqués. Les fichiers de documentation accompagnent l’EXE mais ne sont pas nécessaires à son lancement.
+- Analyse NuGet des dépendances de production, transitives comprises : aucune vulnérabilité connue signalée par la source NuGet lors de cette vérification. Ce résultat ne constitue pas un audit de sécurité exhaustif.
 
-## Vérification graphique sous Wine
+Commandes reproductibles :
 
-Un smoke test automatisé a été exécuté avec Wine 9 dans un préfixe isolé. Il a vérifié : démarrage WPF, détection fictive `Switch-A / Fa0/14 / VLAN 10`, 26 ports, rendu des cinq onglets, compteurs passifs et blocage TDR du port du poste. Le parcours étendu vérifie aussi le formulaire de connexion, les prévisualisations CLI, la simulation sans modification, une description appliquée, la création/suppression d’un VLAN et les quatre paires TDR en démonstration. Le chiffrement/déchiffrement des profils et sauvegardes et l’oubli des identifiants ont été vérifiés avec l’implémentation DPAPI de Wine.
+```bash
+dotnet build SwitchPilot.sln -c Release -warnaserror
+.tools/integration-venv/bin/python tests/ssh_emulator.py
+./build/build.sh
+dotnet list src/SwitchPilot.App/SwitchPilot.App.csproj package --include-transitive --vulnerable
+```
 
-Captures réelles de ce test, avec police de substitution **DejaVu Sans** (Segoe UI n'est pas disponible dans cet environnement) :
+Le SDK doit être accessible dans `PATH`. Les émulateurs et leurs identifiants sont locaux et fictifs ; aucun équipement de production n’a reçu de commande.
 
-- [Mon branchement](screenshots/screen-0.png)
-- [Ports](screenshots/screen-1.png)
-- [VLANs](screenshots/screen-2.png)
-- [Diagnostics](screenshots/screen-3.png)
-- [Journal](screenshots/screen-4.png)
-- [Résultat du smoke test](screenshots/smoke-test.txt)
-- [Progression des scénarios de modification](screenshots/smoke-progress.txt)
+## Couverture des ajouts et corrections
 
-Le parcours complet a réussi sous Wine 9 avec une publication de validation utilisant `IncludeAllContentForSelfExtract=true`, qui extrait aussi les assemblies managées. **Ce réglage de validation n’est pas imposé au build Windows livré.** Le bundle non compressé initial échouait au chargement de CoreCLR (`0x8007046C`). Le bundle compressé 1.0.1 démarre et exécute plusieurs parcours, mais l’automatisation des fenêtres modales reste irrégulière sous Wine ; son smoke test complet n’a pas été validé. L’exécution de l’exécutable final sur Windows natif reste à confirmer. Une temporisation dans le test laisse les fenêtres natives se fermer avant d’ouvrir la suivante ; elle ne change pas le parcours utilisateur normal.
+| Domaine | Vérifications exécutées |
+| --- | --- |
+| Refus IOS | Fixtures avec et sans `%`, `Command rejected`, refus VTP/autorisation ; interruption de séquence et absence de faux succès. |
+| Protection des écritures | Blocage shutdown/VLAN/trunk sur un chemin SSH protégé ou incertain ; exemption console ; contexte périmé et invalidé pendant la sauvegarde ; simulation sans écriture. |
+| Route directe | Fonction de décision vérifiée avec type Windows DIRECT = 3, prochain saut non nul et interface différente. L’appel natif Windows reste à tester. |
+| SSH ancien IOS | Serveur loopback limité à AES-CBC : échec moderne, classification de négociation puis connexion avec compatibilité explicite. L’émulateur ne couvre pas toutes les combinaisons SHA-1 des IOS anciens. |
+| Fréquence de détection | Intervalle minimal de 60 s, regroupement des événements, déclenchement et rafraîchissement périodique. |
+| Paramètres | Conservation du fichier illisible et déduplication des copies de récupération préparées dans les tests Windows ; suppression de la fonction inutilisée `RedactConfig`. |
+| TDR | Distinction autorisation/support, gardes selon le transport, fraîcheur des résultats, paires inconnues/manquantes, accès au port du poste en console et blocage des trunks. |
+| Dépendances | Plateforme simulée : Npcap présent/absent, réseau indisponible, annulation, refus de signature, relance au démarrage suivant après report, nettoyage et activation après installation. |
+| Console | Automate partagé : sans login, authentification, RETURN, réponse `no` seulement au dialogue initial précis, syslogs, mode configuration, pagination, délais, annulation et vitesses. |
+| Transport série réel | Deux consoles PTY Linux utilisant le véritable `SerialPort` : initialisation/commandes et lecture fragmentée avec syslog. Aucun adaptateur USB/COM physique utilisé. |
+| Détection continue | TTL, retrait TTL zéro, annonce périmée, changement de génération, plusieurs cartes, annulation/reprise, erreur de capture et corrélation LLDP/CDP–MAC. La capture injectée ne charge pas Npcap. |
+| Verdict câble | Absence de mesures/duplex/compteurs, reset de compteurs, trafic observé, erreurs croissantes, Gigabit à 100, Fast Ethernet normal, oscillations et mesures switch incomplètes. |
+| Inventaire/historique | CSV avec guillemets, validation des ports, doublons, caractères de contrôle/formules, persistance et bornes de l’historique. |
+| Sauvegarde préalable | Ordre lecture–sauvegarde–écriture, échec de sauvegarde bloquant, absence de sauvegarde en simulation. Test DPAPI spécifique préparé pour Windows. |
 
-La variable `SWITCHPILOT_TEST_FONT` permet uniquement en mode `--smoke-test` de remplacer la police pour cet environnement de validation. Elle n'affecte pas un lancement utilisateur normal. La géométrie des captures dépend aussi du gestionnaire de fenêtres de l'hôte Linux ; elle n'est pas une capture de Windows 11.
+Les tests antérieurs restent présents : parsing Cisco, commandes validées, délais et limites de taille, absence de relance après échec, clé SSH et mots de passe erronés, annulation, sérialisation des échanges, LLDP/CDP tronqués et paquets aléatoires.
 
-## À valider sur Windows natif
+Le message Paramiko « no acceptable ciphers » dans la sortie de l’intégration est attendu : il correspond au premier essai moderne volontairement refusé par le serveur limité à CBC. Le test vérifie ensuite le succès du mode compatible.
 
-La CI Windows fournie exécute automatiquement les tests, le build et le smoke test. Elle n'a pas été déclenchée depuis cette session : aucun dépôt distant ni runner Windows natif n'était disponible.
+## Windows : vérifications encore nécessaires
 
-1. Double-clic sur l'exécutable final avec un compte standard, sur Windows 11 x64 sans runtime .NET préinstallé. Vérifier le rendu à 100 %, 125 % et 150 %, les boîtes de dialogue et l'accès clavier.
-2. Profils et sauvegardes DPAPI : restauration avec le même compte, refus avec un autre compte ; lecture du journal et rotation des fichiers.
-3. Capture Npcap absente, installée et restreinte à l'administrateur ; réception de véritables annonces LLDP et CDP. Aucune capture réelle n'a été effectuée ici.
-4. Vérification de la sélection de carte et de la route Windows `GetBestRoute` : TDR refusé en routage, en IPv6, sur un trunk et sur le port de connexion.
+**Aucun lancement de la 1.0.2 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.2 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.2.
 
-## À valider sur un Catalyst réel
+La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et une tâche limitée pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
 
-Aucun switch ni identifiant réel n'a été fourni. **Aucune commande n'a été envoyée à un équipement de production.** Les fixtures sont synthétiques et l'émulateur n'est pas IOS.
+Recette à effectuer sur Windows 11 x64 :
 
-Sur un switch de laboratoire, noter la référence exacte et la version complète d'IOS :
+1. Double-clic sur l’EXE final sans runtime préinstallé, sous un compte standard ; vérifier aussi le refus du lancement élevé et le rendu à 100/125/150 %.
+2. Exécuter `SwitchPilot.exe --smoke-test`. Il charge `System.IO.Ports`, énumère les ports, vérifie les profils DPAPI SSH/série, les fenêtres paramètres/dépendances/inventaire, les onglets, les aperçus/simulations et le TDR fictif. Résultat dans `%APPDATA%\SwitchPilot\SmokeTest\result.txt`.
+3. Tester un vrai câble COM avec l’EXE single-file : nom convivial, branchement/débranchement, port occupé, chaque vitesse et auto-détection. **La présence de l’assembly Windows dans la publication et les tests PTY ne remplacent pas cet essai.**
+4. Valider DPAPI avec le même compte puis avec un autre compte, la migration des profils 1.0.1, la déduplication `.unreadable`, les sauvegardes et la comparaison en mémoire.
+5. Tester Npcap absent, compatible, incomplet, arrêté, ancien et `admin_only`. Contrôler une signature officielle valide, une signature invalide et un autre éditeur. La vérification native `WinVerifyTrust` n’a pas été exercée ici.
+6. Tester téléchargement via proxy, perte réseau, annulation du téléchargement, refus UAC, annulation de l’installateur, redémarrage demandé, nettoyage et activation de la capture sans relancer l’application. Confirmer que seul l’installateur reçoit l’élévation.
+7. Recevoir de vraies annonces LLDP/CDP sur plusieurs cartes, vérifier TTL et débranchement, les informations WMI de vitesse/duplex, les notifications et le presse-papiers.
+8. Vérifier `GetBestRoute` sur chemin IPv4 direct/routé et IPv6, puis la protection des actions sensibles après changement de câble pendant une confirmation.
 
-1. Vérifier les droits et algorithmes SSH, la clé d'hôte, les sorties `show version`, `show interfaces status`, `show interfaces description`, `show interfaces switchport`, `show vlan brief` et `show mac address-table`.
-2. Brancher le poste sur un port connu ; confronter le résultat au brassage. Vérifier les cas MAC absente, déplacée, multiple, uplink, téléphone intermédiaire et interfaces multiples.
-3. Simuler chaque modification et vérifier l'absence d'effet. Appliquer ensuite sur un port de laboratoire : description, VLAN access, trunk, shutdown/no shutdown, création et suppression de VLAN. Contrôler la running-config puis confirmer séparément `write memory` et comparer la startup-config.
-4. Vérifier les limites du modèle et du port avant TDR. Confirmer le blocage du port du poste. Tester un autre câble de laboratoire, contrôler la fraîcheur des résultats, les états par paire et le repli passif sur un port non compatible.
-5. Exporter la configuration chiffrée, la relire dans l'application et vérifier qu'aucun secret n'apparaît en clair dans les fichiers de paramètres ou le journal.
+## Recette sur Catalyst et câblage réels
 
-## Limites délibérées
+Aucun switch ni câble console physique n’était disponible. Les fixtures sont synthétiques et les émulateurs ne sont pas IOS. Relever le modèle, la version IOS et la version du pilote de carte réseau pour chaque essai.
 
-- Un seul switch actif à la fois ; plusieurs profils enregistrables, sans découverte récursive de topologie.
-- Les interfaces physiques sont identifiées par les API Windows et un filtre des adaptateurs virtuels courants. Les configurations particulières de teaming/bridging nécessitent une recette dédiée.
-- Le TDR est volontairement bloqué en l'absence de preuve suffisante du chemin direct IPv4 et du port local. Le blocage n'est pas contournable dans l'interface.
-- Un TDR interrompu côté client peut continuer sur le switch. Les résultats manquants ou sans fraîcheur démontrée ne sont pas déclarés sains.
-- Les compteurs CRC/collisions sont cumulatifs ; l'application ne remet aucun compteur à zéro.
-- Export chiffré lié au compte Windows, sans export automatique de secrets en clair. L'exécutable est portable ; les secrets DPAPI ne sont pas portables entre comptes.
-- Exécutable non signé. ARM64 prévu par le script, mais non produit ni testé dans cette livraison x64.
+- SSH et console : login, enable, algorithmes anciens, prompts, syslogs intercalés, terminal resté en configuration et dialogue initial. Contrôler les sorties `show` et les refus d’autorisation réels.
+- Branchement : port connu, déplacement, MAC absente/multiple, téléphone intermédiaire, trunk/agrégat, absence d’annonce et contradiction entre annonce et table MAC. Contrôler le délai minimal entre lectures automatiques.
+- Mesures : port Fast Ethernet à 100, port Gigabit, câble volontairement dégradé, erreurs croissantes, absence de trafic et duplex non fourni par le pilote. Vérifier les preuves du verdict et l’historique par port.
+- Écritures sur ports de laboratoire : simulation, sauvegarde préalable déchiffrable, description, VLAN access, trunk, shutdown, création/suppression VLAN et `write memory` distinct. Vérifier le blocage du port de gestion en SSH.
+- TDR : blocage du port du poste en SSH, test autorisé en console après avertissement, interruption attendue, résultats neufs, redétection, option automatique désactivée par défaut et absence de boucle après sa propre interruption. Tester refus d’autorisation et modèle non compatible.
+- Inventaire et comparaison : aller-retour CSV, remplacement explicite des doublons, association à une prise et absence de secrets en clair dans les paramètres, sauvegardes et journal.
 
-## Performances
+## Limites de livraison
 
-Les mesures synthétiques avant/après et leurs limites figurent dans [PERFORMANCE.md](PERFORMANCE.md). Elles ne constituent pas un essai de charge sur un Catalyst réel.
+Un seul switch actif à la fois ; aucune exploration récursive. Les annonces ne prouvent pas le port final. Les particularités de teaming/bridging nécessitent une recette dédiée. Un TDR interrompu côté client peut continuer côté switch ; les commandes IOS déjà acceptées ne sont pas annulées automatiquement. Les sauvegardes DPAPI dépendent du compte Windows.
+
+L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.2 sur matériel.

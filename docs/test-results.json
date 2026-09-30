@@ -1,52 +1,63 @@
 {
+  "version": "1.0.2",
+  "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
   "integration": {
-    "total": "98",
-    "executed": "95",
-    "passed": "95",
-    "failed": "0",
-    "error": "0",
-    "timeout": "0",
-    "aborted": "0",
-    "inconclusive": "0",
-    "passedButRunAborted": "0",
-    "notRunnable": "0",
-    "notExecuted": "0",
-    "disconnected": "0",
-    "warning": "0",
-    "completed": "0",
-    "inProgress": "0",
-    "pending": "0",
+    "total": 162,
+    "executed": 156,
+    "passed": 156,
+    "failed": 0,
+    "skipped": 6,
     "timing": {
-      "creation": "2026-09-30T00:56:06.3639177+02:00",
-      "queuing": "2026-09-30T00:56:06.3639178+02:00",
-      "start": "2026-09-30T00:56:05.8725087+02:00",
-      "finish": "2026-09-30T00:56:13.0227750+02:00"
+      "creation": "2026-09-30T12:32:01.6698717+02:00",
+      "queuing": "2026-09-30T12:32:01.6698718+02:00",
+      "start": "2026-09-30T12:32:01.2045379+02:00",
+      "finish": "2026-09-30T12:32:09.2330142+02:00"
     },
-    "skipped": "3"
+    "skipped_tests": [
+      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
+      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
+      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
+      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
+      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable",
+      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
+    ]
   },
   "regression": {
-    "total": "98",
-    "executed": "88",
-    "passed": "88",
-    "failed": "0",
-    "error": "0",
-    "timeout": "0",
-    "aborted": "0",
-    "inconclusive": "0",
-    "passedButRunAborted": "0",
-    "notRunnable": "0",
-    "notExecuted": "0",
-    "disconnected": "0",
-    "warning": "0",
-    "completed": "0",
-    "inProgress": "0",
-    "pending": "0",
+    "total": 162,
+    "executed": 146,
+    "passed": 146,
+    "failed": 0,
+    "skipped": 16,
     "timing": {
-      "creation": "2026-09-30T01:02:49.9822947+02:00",
-      "queuing": "2026-09-30T01:02:49.9822948+02:00",
-      "start": "2026-09-30T01:02:49.4679581+02:00",
-      "finish": "2026-09-30T01:02:55.3987463+02:00"
+      "creation": "2026-09-30T12:34:10.6991780+02:00",
+      "queuing": "2026-09-30T12:34:10.6991781+02:00",
+      "start": "2026-09-30T12:34:10.2278784+02:00",
+      "finish": "2026-09-30T12:34:16.1589767+02:00"
     },
-    "skipped": "10"
+    "skipped_tests": [
+      "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
+      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
+      "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
+      "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
+      "SwitchPilot.Tests.SshIntegrationTests.CancellationClosesSessionAndDisposeIsIdempotent",
+      "SwitchPilot.Tests.SshIntegrationTests.RealSshTransportReadsAndConfiguresEmulatedIos",
+      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
+      "SwitchPilot.Tests.SshIntegrationTests.LegacyAlgorithmsRequireExplicitRetry",
+      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
+      "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelHandlesFragmentedOutputAndSyslog",
+      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode",
+      "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
+      "SwitchPilot.Tests.SshIntegrationTests.ConcurrentCommandsDoNotMixResponses",
+      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
+      "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected",
+      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable"
+    ]
+  },
+  "artifact": {
+    "path": "artifacts/win-x64/SwitchPilot.exe",
+    "bytes": 68303037,
+    "sha256": "7efd257e10314ecaf09766c5a7ac42144decd8dd31c7ba3823a276f5b319b66d",
+    "native_windows_execution": "not run",
+    "hardware_validation": "not run"
   }
 }

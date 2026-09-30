@@ -32,6 +32,18 @@ public static class Dialogs
         apply.Click += (_, _) => window.DialogResult = true; buttons.Children.Add(cancel); buttons.Children.Add(apply); panel.Children.Add(buttons);
         return window.ShowDialog() == true;
     }
+    public static void CompareConfigurations(string before, string current)
+    {
+        var window = Shell("Comparer · sauvegarde / configuration actuelle", 1100);
+        window.Height = 700; window.SizeToContent = SizeToContent.Manual; window.ResizeMode = ResizeMode.CanResize;
+        var grid = new Grid { Margin = new Thickness(24) }; grid.ColumnDefinitions.Add(new()); grid.ColumnDefinitions.Add(new());
+        foreach (var (text, column) in new[] { ("SAUVEGARDE\n\n" + before, 0), ("CONFIGURATION ACTUELLE\n\n" + current, 1) })
+        {
+            var box = new TextBox { Text = text, IsReadOnly = true, FontFamily = (FontFamily)Application.Current.FindResource("CodeFont"), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(4) };
+            Grid.SetColumn(box, column); grid.Children.Add(box);
+        }
+        window.Content = grid; window.ShowDialog();
+    }
     public static void ShowText(string title, string text)
     {
         var window = Shell(title, 900); window.Height = 650; window.SizeToContent = SizeToContent.Manual; window.ResizeMode = ResizeMode.CanResize;

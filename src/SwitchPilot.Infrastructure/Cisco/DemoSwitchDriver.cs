@@ -24,7 +24,7 @@ public sealed class DemoSwitchDriver(IAuditSink audit) : ISwitchDriver
         audit.Write($"TDR {port}", "Démonstration : résultat fictif.");
         return Task.FromResult(new TdrResult(port, [new("A", "18 +/- 2 meters", "Pair B", "OK"), new("B", "18 +/- 2 meters", "Pair A", "OK"), new("C", "19 +/- 2 meters", "Pair D", "OK"), new("D", "19 +/- 2 meters", "Pair C", "OK")], "Données fictives du mode démonstration."));
     }
-    public Task ApplyAsync(CommandPlan plan, bool dryRun, CancellationToken ct = default)
+    public Task ApplyAsync(CommandPlan plan, bool dryRun, CancellationToken ct = default, SafetyContext? safety = null)
     {
         audit.Write(plan.Title, dryRun ? "Simulation : aucune modification." : "Démonstration : modification en mémoire uniquement.");
         if (dryRun) return Task.CompletedTask;

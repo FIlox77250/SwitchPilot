@@ -1,33 +1,20 @@
+using SwitchPilot.Infrastructure.Terminal;
 using Renci.SshNet;
 using SwitchPilot.Core;
 
 namespace SwitchPilot.Infrastructure.Ssh;
 
-public sealed class SshSession : ICliSession
+public sealed class SshSession : TerminalSession
 {
     private readonly SshClient client;
-    private readonly ITerminalChannel channel;
-    private readonly CliConversation conversation;
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private string enablePassword;
-    private int disposed;
-    public bool IsConnected
-    {
-        get
-        {
-            if (Volatile.Read(ref disposed) != 0) return false;
-            try { return client.IsConnected && channel.IsOpen; }
-            catch (ObjectDisposedException) { return false; }
-        }
-    }
-    public string Hostname => conversation.Hostname;
-    private SshSession(SshClient client, ITerminalChannel channel, string enablePassword)
-    {
-        this.client = client; this.channel = channel; this.enablePassword = enablePassword;
-        conversation = new(channel);
-    }
+    public override ConnectionKind Kind => ConnectionKind.Ssh;
+    private SshSession(SshClient client, ITerminalChannel channel, string enablePassword) : base(channel, enablePassword) => this.client = client;
+    public static bool IsNegotiationFailure(Exception error) => error is Renci.SshNet.Common.SshConnectionException e &&
+        e.DisconnectReason == Renci.SshNet.Messages.Transport.DisconnectReason.KeyExchangeFailed;
+
     public static async Task<SshSession> ConnectAsync(ConnectionProfile profile, Func<string, string, bool> trustHost, bool legacyAlgorithms, CancellationToken ct)
     {
+        profile.Validate();
         if (string.IsNullOrWhiteSpace(profile.Host) || string.IsNullOrWhiteSpace(profile.Username) || profile.Port is < 1 or > 65535)
             throw new ArgumentException("Adresse du switch, utilisateur et port SSH valide requis.");
         if (profile.EnablePassword.Any(char.IsControl)) throw new ArgumentException("Le mot de passe enable ne doit pas contenir de caractères de contrôle.");
@@ -47,33 +34,13 @@ public sealed class SshSession : ICliSession
             await ssh.ConnectAsync(ct);
             var stream = ssh.CreateShellStream("vt100", 240, 80, 0, 0, 65536);
             session = new(ssh, new ShellChannel(stream, ssh), profile.EnablePassword);
-            await session.conversation.InitializeAsync(ct);
-            if (profile.EnablePassword.Length > 0) await session.conversation.EnsurePrivilegedAsync(profile.EnablePassword, ct);
+            await session.Conversation.InitializeAsync(ct);
+            if (profile.EnablePassword.Length > 0) await session.Conversation.EnsurePrivilegedAsync(profile.EnablePassword, ct);
             return session;
         }
         catch { if (session != null) await session.DisposeAsync(); else ssh.Dispose(); throw; }
     }
-    public async Task<string> ExecuteAsync(string command, CancellationToken cancellationToken = default)
-    {
-        await gate.WaitAsync(cancellationToken);
-        try
-        {
-            if (!IsConnected) throw new IOException("Session SSH déconnectée.");
-            if (command is "configure terminal" or "write memory" or "show running-config" or "show vlan brief" || command.StartsWith("test cable-diagnostics") || command.StartsWith("show cable-diagnostics") || command.StartsWith("show mac"))
-                await conversation.EnsurePrivilegedAsync(enablePassword, cancellationToken);
-            return await conversation.CommandAsync(command, cancellationToken);
-        }
-        catch (Exception e) when (e is TimeoutException or OperationCanceledException or IOException)
-        { await DisposeAsync(); throw; }
-        finally { gate.Release(); }
-    }
-    public ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref disposed, 1) != 0) return ValueTask.CompletedTask;
-        enablePassword = "";
-        channel.Dispose(); client.Dispose();
-        return ValueTask.CompletedTask;
-    }
+    protected override void DisposeTransport() => client.Dispose();
     private sealed class ShellChannel(ShellStream stream, SshClient ssh) : ITerminalChannel
     {
         private bool disposed;

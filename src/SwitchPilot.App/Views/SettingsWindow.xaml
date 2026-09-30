@@ -1,0 +1,15 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="SwitchPilot.App.Views.SettingsWindow" Title="Paramètres" Width="630" SizeToContent="Height" WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False">
+  <StackPanel Margin="30">
+    <TextBlock Text="Paramètres" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,24"/>
+    <TextBlock Text="Intervalle minimal des lectures automatiques du switch (secondes)" Style="{StaticResource Label}"/>
+    <TextBox x:Name="Interval" MaxLength="4"/>
+    <TextBlock Text="60 secondes par défaut. Les changements de lien sont surveillés localement en continu sans commandes SSH." Style="{StaticResource MutedText}" Margin="0,0,0,20"/>
+    <CheckBox x:Name="AutoTdr" Content="Lancer le TDR automatiquement après détection (console uniquement)" Margin="0,0,0,12"/>
+    <TextBlock Text="Cette option coupe temporairement le lien Ethernet du port identifié. Elle exige une connexion console et la désactivation de la simulation ; un seul test par branchement." Style="{StaticResource MutedText}" Margin="0,0,0,20"/>
+    <TextBlock Text="Dépendances" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12"/>
+    <TextBlock Text="{Binding Dependencies.Status.Label}" Margin="0,0,0,12"/>
+    <Button Content="Npcap et pilotes console · installer / vérifier" Command="{Binding DependenciesCommand}" HorizontalAlignment="Left" Margin="0,0,0,20"/>
+    <TextBlock x:Name="Error" Foreground="#A04D3F" Margin="0,0,0,12"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Annuler" IsCancel="True"/><Button Content="Enregistrer" Click="Save" Style="{StaticResource PrimaryButton}"/></StackPanel>
+  </StackPanel>
+</Window>
