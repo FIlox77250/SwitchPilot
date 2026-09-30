@@ -37,6 +37,19 @@ try {
     if ($Info.LastTaskResult -ne 0 -or !(Test-Path (Join-Path $Result 'result.txt'))) { throw 'Standard-user WPF smoke test failed' }
     if (!(Get-Content (Join-Path $Result 'result.txt') -Raw).StartsWith('PASS:')) { throw 'Smoke test did not report success' }
 } finally {
+    if ($Account) {
+        $Profile = Get-CimInstance Win32_UserProfile | Where-Object SID -eq $Account.SID.Value
+        if ($Profile) {
+            $Result = Join-Path $Profile.LocalPath 'AppData/Roaming/SwitchPilot/SmokeTest'
+            if (Test-Path $Result) {
+                New-Item -ItemType Directory -Path $Output -Force | Out-Null
+                Copy-Item "$Result/*" $Output -Recurse -Force
+                Get-ChildItem $Result -Filter '*.txt' | ForEach-Object { Get-Content $_.FullName }
+            }
+        }
+        if ($Info) { Write-Host "Task result: $($Info.LastTaskResult); last run: $($Info.LastRunTime); running: $Running" }
+        Get-Process -Name SwitchPilot -ErrorAction SilentlyContinue | Select-Object Id, SessionId, MainWindowTitle | Format-Table
+    }
     if (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue) {
         Stop-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $Task -Confirm:$false

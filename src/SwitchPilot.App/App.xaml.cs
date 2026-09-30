@@ -24,6 +24,13 @@ public partial class App : Application
         }
         DispatcherUnhandledException += (_, args) =>
         {
+            if (e.Args.Contains("--smoke-test"))
+            {
+                var directory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SwitchPilot", "SmokeTest");
+                System.IO.Directory.CreateDirectory(directory);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "result.txt"), "FAIL: " + args.Exception);
+                args.Handled = true; Shutdown(1); return;
+            }
             MessageBox.Show("Une erreur inattendue est survenue. L'opération peut être partielle : reconnectez-vous et vérifiez l'état du switch.\n\n" + args.Exception.GetType().Name, "Switch Pilot", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };
