@@ -105,20 +105,23 @@ public class UpdateTests
     public void ApplyScriptIsWrittenAndUnsafePathsAreRefused()
     {
         var directory = Path.Combine(Path.GetTempPath(), "switchpilot-script-" + Guid.NewGuid().ToString("N"));
+        var staging = Path.Combine(Path.GetTempPath(), "switchpilot-staging-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
         {
             var target = Path.Combine(directory, "SwitchPilot.exe");
-            var source = Path.Combine(directory, "SwitchPilot-1.0.3.exe");
+            var source = Path.Combine(directory, "SwitchPilot-1.0.6.exe");
             File.WriteAllText(target, "old");
             File.WriteAllText(source, "new");
-            var script = new UpdateInstaller().CreateApplyScript(target, source);
+            // Use a dedicated staging directory so the test never deletes a real staged update.
+            var installer = new UpdateInstaller(staging);
+            var script = installer.CreateApplyScript(target, source);
             Assert.True(File.Exists(script));
             var content = File.ReadAllText(script);
             Assert.Contains(target, content);
             Assert.Contains(source, content);
-            Assert.Throws<InvalidOperationException>(() => new UpdateInstaller().CreateApplyScript(Path.Combine(directory, "%TEMP%\\SwitchPilot.exe"), source));
+            Assert.Throws<InvalidOperationException>(() => installer.CreateApplyScript(Path.Combine(directory, "%TEMP%\\SwitchPilot.exe"), source));
         }
-        finally { Directory.Delete(Path.Combine(Path.GetTempPath(), "SwitchPilot-Update"), true); Directory.Delete(directory, true); }
+        finally { Directory.Delete(directory, true); if (Directory.Exists(staging)) Directory.Delete(staging, true); }
     }
 }

@@ -16,7 +16,7 @@ public sealed class UpdateViewModel : ObservableObject
     private readonly Version currentVersion;
     private CancellationTokenSource? cancellation;
     private UpdateRelease? release;
-    private bool busy, available, indeterminate;
+    private bool busy, available, indeterminate, canSelfUpdate;
     private double progress;
     private string message = "Recherche d'une nouvelle version…";
 
@@ -25,7 +25,7 @@ public sealed class UpdateViewModel : ObservableObject
     /// <summary>Raised once the update is staged and the application must exit so the script can swap the file.</summary>
     public event Action? RestartRequested;
 
-    public UpdateRelease? Release { get => release; private set { Set(ref release, value); Raise(nameof(Notes)); Raise(nameof(VersionLabel)); Raise(nameof(HasNotes)); Raise(nameof(CanInstall)); } }
+    public UpdateRelease? Release { get => release; private set { Set(ref release, value); canSelfUpdate = value is not null && UpdateInstaller.CanSelfUpdate(); Raise(nameof(Notes)); Raise(nameof(VersionLabel)); Raise(nameof(HasNotes)); Raise(nameof(CanInstall)); } }
     public bool Available { get => available; private set { Set(ref available, value); Raise(nameof(CanInstall)); CommandManager.InvalidateRequerySuggested(); } }
     public bool Busy { get => busy; private set { Set(ref busy, value); Raise(nameof(CanInstall)); CommandManager.InvalidateRequerySuggested(); } }
     public double Progress { get => progress; private set => Set(ref progress, value); }
@@ -33,8 +33,8 @@ public sealed class UpdateViewModel : ObservableObject
     public string Message { get => message; private set => Set(ref message, value); }
     public string Notes => Release?.Notes?.Trim() is { Length: > 0 } notes ? notes : "(Aucune note de version publiée.)";
     public bool HasNotes => Release?.Notes?.Trim() is { Length: > 0 };
-    public string VersionLabel => Release is null ? "" : $"Version {Release.Version} publiée le GitHub — {Release.Name}";
-    public bool CanInstall => Available && !Busy && Release is not null && UpdateInstaller.CanSelfUpdate();
+    public string VersionLabel => Release is null ? "" : $"Version {Release.Version.ToString(3)} — {Release.Name}";
+    public bool CanInstall => Available && !Busy && Release is not null && canSelfUpdate;
 
     public ICommand InstallCommand { get; }
     public ICommand LaterCommand { get; }
@@ -78,7 +78,7 @@ public sealed class UpdateViewModel : ObservableObject
             }
             Release = result.Release;
             Available = true;
-            Message = $"Une nouvelle version est disponible : {result.Release.Version}.";
+            Message = $"Une nouvelle version est disponible : {result.Release.Version.ToString(3)}.";
         }
         catch (OperationCanceledException) { Message = "Vérification annulée."; }
         finally { Busy = false; Indeterminate = false; }
@@ -100,7 +100,7 @@ public sealed class UpdateViewModel : ObservableObject
         }
         Busy = true; Progress = 0; Indeterminate = false;
         cancellation = new CancellationTokenSource();
-        var staged = Path.Combine(UpdateInstaller.StagingDirectory, $"SwitchPilot-{Release.Version}.exe");
+        var staged = Path.Combine(installer.StagingDirectory, $"SwitchPilot-{Release.Version.ToString(3)}.exe");
         try
         {
             if (File.Exists(staged)) File.Delete(staged);
@@ -123,7 +123,7 @@ public sealed class UpdateViewModel : ObservableObject
         }
         catch (OperationCanceledException) { TryDelete(staged); Message = "Téléchargement de la mise à jour annulé."; }
         catch (HttpRequestException) { TryDelete(staged); Message = "Téléchargement impossible. Vérifiez Internet ou le proxy, puis réessayez."; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or HttpRequestException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or HttpRequestException or TimeoutException)
         {
             TryDelete(staged);
             Message = e is InvalidOperationException ? e.Message : "Mise à jour impossible. Téléchargez la nouvelle version depuis la page GitHub.";

@@ -1,4 +1,4 @@
-# Validation de Switch Pilot 1.0.5
+# Validation de Switch Pilot 1.0.6
 
 État au 30 septembre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
 
@@ -7,8 +7,8 @@
 Environnement : Linux Ubuntu, SDK .NET 10.0.401, build Release, runtime cible .NET/WPF 10.0.12.
 
 - Compilation de la solution avec `dotnet build SwitchPilot.sln -c Release -warnaserror` : **zéro erreur, zéro avertissement**.
-- Suite locale (Linux, émulateur SSH arrêté) : **178 tests réussis, 17 ignorés, 0 échec, 195 au total**. Les tests ignorés nécessitent Windows (DPAPI, Authenticode) ou l’émulateur SSH local ; aucun n’échoue.
-- Suite avec l’émulateur SSH local lancé : les tests d’intégration SSH complètent la suite précédente. Les exclusions restantes concernent Windows et les consoles PTY selon l’environnement.
+- Suite locale (Linux, émulateur SSH arrêté) : **184 tests réussis, 17 ignorés, 0 échec, 201 au total**. Les tests ignorés nécessitent Windows (DPAPI, Authenticode) ou l’émulateur SSH local ; aucun n’échoue.
+- Suite avec l’émulateur SSH local lancé : les tests d’intégration SSH complètent la suite précédente. Les exclusions restantes concernent Windows et le PTY série selon l’environnement.
 - Publication autonome `win-x64`, single-file compressé, sans trimming. Le fichier produit est un exécutable PE32+ GUI x64 ; le runtime et les dépendances sont embarqués. Les fichiers de documentation accompagnent l’EXE mais ne sont pas nécessaires à son lancement.
 - Analyse NuGet des dépendances de production, transitives comprises : aucune vulnérabilité connue signalée par la source NuGet lors de cette vérification. Ce résultat ne constitue pas un audit de sécurité exhaustif.
 
@@ -29,14 +29,14 @@ Le SDK doit être accessible dans `PATH`. Les émulateurs et leurs identifiants 
 | --- | --- |
 | Refus IOS | Fixtures avec et sans `%`, `Command rejected`, refus VTP/autorisation ; interruption de séquence et absence de faux succès. |
 | Protection des écritures | Blocage shutdown/VLAN/trunk sur un chemin SSH protégé ou incertain ; exemption console ; contexte périmé et invalidé pendant la sauvegarde ; simulation sans écriture. |
-| Route directe | Fonction de décision vérifiée avec type Windows DIRECT = 3, prochain saut non nul et interface différente. L’appel natif Windows reste à tester. |
+| Route directe | Fonction de décision vérifiée avec type Windows DIRECT = 3 et index d’interface de route égal à celui de la carte ; les réponses DNS IPv6 sont ignorées. L’appel natif Windows reste à tester. |
 | SSH ancien IOS | Serveur loopback limité à AES-CBC : échec moderne, classification de négociation puis connexion avec compatibilité explicite. L’émulateur ne couvre pas toutes les combinaisons SHA-1 des IOS anciens. |
 | Fréquence de détection | Intervalle minimal de 60 s, regroupement des événements, déclenchement et rafraîchissement périodique. |
 | Paramètres | Conservation du fichier illisible et déduplication des copies de récupération préparées dans les tests Windows ; suppression de la fonction inutilisée `RedactConfig`. |
 | TDR | Distinction autorisation/support, gardes selon le transport, fraîcheur des résultats, paires inconnues/manquantes, accès au port du poste en console et blocage des trunks. |
 | Dépendances | Plateforme simulée : Npcap présent/absent, réseau indisponible, annulation, refus de signature, relance au démarrage suivant après report, nettoyage et activation après installation. |
 | Console | Automate partagé : sans login, authentification, RETURN, réponse `no` seulement au dialogue initial précis, syslogs, mode configuration, pagination, délais, annulation et vitesses. |
-| Transport série réel | Deux consoles PTY Linux utilisant le véritable `SerialPort` : initialisation/commandes et lecture fragmentée avec syslog. Aucun adaptateur USB/COM physique utilisé. |
+| Transport série réel | Un pseudo-terminal PTY Linux utilisant le véritable `SerialPort`, exercé par deux tests : initialisation/commandes et lecture fragmentée avec syslog. Aucun adaptateur USB/COM physique utilisé. |
 | Détection continue | TTL, retrait TTL zéro, annonce périmée, changement de génération, plusieurs cartes, annulation/reprise, erreur de capture et corrélation LLDP/CDP–MAC. La capture injectée ne charge pas Npcap. |
 | Verdict câble | Absence de mesures/duplex/compteurs, reset de compteurs, trafic observé, erreurs croissantes, Gigabit à 100, Fast Ethernet normal, oscillations et mesures switch incomplètes. |
 | Inventaire/historique | CSV avec guillemets, validation des ports, doublons, caractères de contrôle/formules, persistance et bornes de l’historique. |
@@ -50,7 +50,7 @@ Le message Paramiko « no acceptable ciphers » dans la sortie de l’intégrati
 
 ## Windows : vérifications encore nécessaires
 
-**Aucun lancement de la 1.0.5 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.5 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.5.
+**Aucun lancement de la 1.0.6 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.6 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.6.
 
 La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et lance directement le processus avec ce compte et son profil chargé pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
 
@@ -80,4 +80,4 @@ Aucun switch ni câble console physique n’était disponible. Les fixtures sont
 
 Un seul switch actif à la fois ; aucune exploration récursive. Les annonces ne prouvent pas le port final. Les particularités de teaming/bridging nécessitent une recette dédiée. Un TDR interrompu côté client peut continuer côté switch ; les commandes IOS déjà acceptées ne sont pas annulées automatiquement. Les sauvegardes DPAPI dépendent du compte Windows.
 
-L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.5 sur matériel.
+L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.6 sur matériel.

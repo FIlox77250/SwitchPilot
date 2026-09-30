@@ -50,10 +50,11 @@ public sealed class DependenciesViewModel : ObservableObject
             else await CheckAsync(cancellation.Token);
             Message = Status.Detail;
         }
-        catch (OperationCanceledException) { Message = "Installation ou téléchargement annulé. Vous pouvez continuer en SSH ou console."; }
+        catch (OperationCanceledException e) { Message = e.Message.Length > 0 ? e.Message : "Installation ou téléchargement annulé. Vous pouvez continuer en SSH ou console."; }
         catch (HttpRequestException) { Message = "Téléchargement impossible. Vérifiez Internet et le proxy, ou utilisez l’installation manuelle sur npcap.com."; }
-        catch (Exception e) when (e is InvalidOperationException or System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is InvalidOperationException or System.IO.InvalidDataException or System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         { Message = e is InvalidOperationException ? e.Message : "Installation impossible. Utilisez le lien npcap.com pour une installation manuelle."; }
+        catch (Exception) { Message = "Installation impossible. Utilisez le lien npcap.com pour une installation manuelle."; }
         finally { cancellation.Dispose(); cancellation = null; Busy = false; Indeterminate = false; }
     }
 }

@@ -35,12 +35,6 @@ public sealed class AlliedTelesisDriver(ICliSession session, IAuditSink audit, I
     {
         var info = await ReadIdentity(ct);
         var ports = CiscoParser.Ports(await session.ExecuteAsync("show interface status", ct));
-        try
-        {
-            var descriptions = CiscoParser.Descriptions(await session.ExecuteAsync("show interface description", ct));
-            ports = ports.Select(p => p with { Description = descriptions.GetValueOrDefault(p.Name, p.Description) }).ToArray();
-        }
-        catch (CliException) { audit.Write("Lecture des descriptions", "Descriptions limitées à la sortie interface status."); }
         var vlanOutput = await session.ExecuteAsync("show vlan brief", ct);
         IReadOnlyList<VlanInfo> vlans;
         try { vlans = AlliedTelesisParser.Vlans(vlanOutput); }
@@ -51,8 +45,22 @@ public sealed class AlliedTelesisDriver(ICliSession session, IAuditSink audit, I
         return lastSnapshot;
     }
 
-    private async Task<SwitchIdentity> ReadIdentity(CancellationToken ct) => identity ??=
-        AlliedTelesisParser.Identity(session.Hostname, await session.ExecuteAsync("show version", ct));
+    private async Task<SwitchIdentity> ReadIdentity(CancellationToken ct)
+    {
+        if (identity is not null) return identity;
+        identity = AlliedTelesisParser.Identity(session.Hostname, await session.ExecuteAsync("show version", ct));
+        if (identity.Model.Contains("inconnu", StringComparison.OrdinalIgnoreCase))
+        {
+            // The board/model line lives in `show system`, not `show version`, on AW+.
+            try
+            {
+                var system = await session.ExecuteAsync("show system", ct);
+                if (AlliedTelesisParser.Model(system) is { } model) identity = identity with { Model = model };
+            }
+            catch (CliException) { /* Keep the generic model name. */ }
+        }
+        return identity;
+    }
 
     public async Task<DetectionObservation> ReadDetectionAsync(string mac, CancellationToken ct = default)
     {
@@ -89,7 +97,7 @@ public sealed class AlliedTelesisDriver(ICliSession session, IAuditSink audit, I
             macCommand = "show mac-address-table";
             output = await session.ExecuteAsync(macCommand, ct);
         }
-        return CiscoParser.Macs(output);
+        return AlliedTelesisParser.Macs(output);
     }
 
     public async Task<IReadOnlyList<MacEntry>> ReadMacTableAsync(CancellationToken ct = default)

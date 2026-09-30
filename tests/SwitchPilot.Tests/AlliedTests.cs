@@ -24,8 +24,9 @@ public class AlliedTests
         """;
 
     private const string MacOutput = """
-        VLAN  MAC Address        Type      Ports
-        1     00:11:22:33:44:55  dynamic   port1.0.1
+        VLAN port      mac                fwd
+        1    port1.0.1 0011.2233.4455     forward dynamic
+        1    CPU       eccd.6d20.c0a3     forward static
         """;
 
     [Fact]
@@ -35,6 +36,43 @@ public class AlliedTests
         Assert.Equal("port1.0.1", CiscoParser.NormalizeInterface("port1.0.1"));
         Assert.Equal("port1.0.1", CommandPlan.Interface("port1.0.1"));
         Assert.Equal("port1.0.1", CommandPlan.Interface("1.0.1"));
+    }
+
+    [Fact]
+    public void AlliedMacTableUsesPortBeforeMac()
+    {
+        var entries = AlliedTelesisParser.Macs(MacOutput);
+        Assert.Equal(new MacEntry(1, "001122334455", "DYNAMIC", "port1.0.1"), Assert.Single(entries));
+        Assert.Throws<FormatException>(() => AlliedTelesisParser.Macs("unexpected output"));
+    }
+
+    [Fact]
+    public void AlliedVlanContinuationLinesKeepMemberPorts()
+    {
+        const string output = "VLAN ID  Name     Type    State   Member ports\n1        default  STATIC  ACTIVE  port1.0.1(u)\n                 port1.0.2(u) port1.0.3(t)\n";
+        var vlan = Assert.Single(AlliedTelesisParser.Vlans(output));
+        Assert.Equal("port1.0.1, port1.0.2, port1.0.3", vlan.Ports);
+        var modes = AlliedTelesisParser.PortModes(output);
+        Assert.Equal("access", modes["port1.0.2"]);
+        Assert.Equal("trunk", modes["port1.0.3"]);
+    }
+
+    [Fact]
+    public void AlliedTrunkPlanResetsThenAdds()
+    {
+        var plan = CommandPlan.Trunk("port1.0.1", 1, "1,10", SwitchVendor.AlliedTelesis);
+        Assert.Contains("switchport trunk allowed vlan none", plan.Commands);
+        Assert.Contains("switchport trunk allowed vlan add 1,10", plan.Commands);
+        Assert.DoesNotContain("switchport trunk allowed vlan 1,10", plan.Commands);
+        Assert.Contains("switchport trunk allowed vlan 1,10", CommandPlan.Trunk("Gi0/1", 1, "1,10").Commands);
+    }
+
+    [Fact]
+    public void AlliedDescriptionLimitIsEighty()
+    {
+        Assert.Throws<ArgumentException>(() => CommandPlan.Describe("port1.0.1", new string('a', 81), SwitchVendor.AlliedTelesis));
+        Assert.NotNull(CommandPlan.Describe("port1.0.1", new string('a', 80), SwitchVendor.AlliedTelesis));
+        Assert.NotNull(CommandPlan.Describe("Fa0/1", new string('a', 81), SwitchVendor.Cisco));
     }
 
     [Theory]

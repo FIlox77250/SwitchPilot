@@ -1,11 +1,14 @@
 param(
     [ValidateSet('win-x64', 'win-arm64')][string]$Runtime = 'win-x64',
-    [string]$Version = '1.0.5',
+    [string]$Version = '',
     [switch]$SkipTests
 )
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $Output = Join-Path $Root "artifacts/$Runtime"
+# Single source of truth for the version: Directory.Build.props (override with -Version).
+if (!$Version) { $Version = ([xml](Get-Content -Raw (Join-Path $Root 'Directory.Build.props'))).Project.PropertyGroup.Version }
+if (!$Version) { throw 'Version introuvable dans Directory.Build.props.' }
 Push-Location $Root
 try {
     if (!(Get-Command dotnet -ErrorAction SilentlyContinue)) { throw 'Installez le SDK .NET 10.0.401 ou un correctif plus récent de cette bande.' }

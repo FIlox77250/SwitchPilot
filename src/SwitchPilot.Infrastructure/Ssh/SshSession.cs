@@ -38,7 +38,13 @@ public sealed class SshSession : TerminalSession
         keyboard.AuthenticationPrompt += (_, e) =>
         {
             foreach (var prompt in e.Prompts)
-                prompt.Response = Regex.IsMatch(prompt.Request ?? "", "user|login", RegexOptions.IgnoreCase) ? profile.Username : profile.Password;
+            {
+                var request = prompt.Request ?? "";
+                // "Password for user:" contains "user": test the password keywords first, and
+                // default to the password when the prompt asks for neither.
+                prompt.Response = Regex.IsMatch(request, "password|passcode|secret", RegexOptions.IgnoreCase) || !Regex.IsMatch(request, "user|login|name", RegexOptions.IgnoreCase)
+                    ? profile.Password : profile.Username;
+            }
         };
         var info = new ConnectionInfo(profile.Host.Trim(), profile.Port, profile.Username, password, keyboard) { Timeout = TimeSpan.FromSeconds(15) };
         if (!legacyAlgorithms)

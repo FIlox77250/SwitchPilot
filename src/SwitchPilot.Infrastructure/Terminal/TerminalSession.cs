@@ -25,12 +25,14 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
                 return await Conversation.CommandAsync(command, cancellationToken);
             }
             try { return await Conversation.CommandAsync(command, cancellationToken); }
-            catch (CliException) when (!Conversation.Privileged)
+            catch (CliException e) when (!Conversation.Privileged && e.Failure == CliFailure.Authorization)
             {
                 // Some platforms (AlliedWare Plus in particular) only expose certain read
                 // commands to privileged users. Elevate and retry once instead of forcing
-                // "enable" upfront, which fails when no enable password was provided.
-                await Conversation.EnsurePrivilegedAsync(secret, cancellationToken);
+                // "enable" upfront. Only an authorization refusal justifies elevation, and an
+                // impossible elevation keeps the original error instead of masking it.
+                try { await Conversation.EnsurePrivilegedAsync(secret, cancellationToken); }
+                catch (CliException) { throw e; }
                 return await Conversation.CommandAsync(command, cancellationToken);
             }
         }

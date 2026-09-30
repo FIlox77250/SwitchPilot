@@ -27,7 +27,8 @@ public sealed class NpcapPlatform : IDependencyPlatform
             if (!File.Exists(Path.Combine(system, "drivers", "npcap.sys")) || !File.Exists(library) || !File.Exists(Path.Combine(directory, "Packet.dll")))
                 return new(DependencyState.Incomplete, "—", "Pilote ou bibliothèques manquants");
             using var parameters = service.OpenSubKey("Parameters");
-            if (Convert.ToInt32(parameters?.GetValue("AdminOnly", 0)) != 0)
+            var adminOnly = parameters?.GetValue("AdminOnly");
+            if (adminOnly is not null && int.TryParse(Convert.ToString(adminOnly, System.Globalization.CultureInfo.InvariantCulture), out var adminFlag) && adminFlag != 0)
                 return new(DependencyState.Restricted, "—", "Accès réservé aux administrateurs. Réinstaller Npcap sans cette option ; l’application ne demandera pas d’élévation pour capturer.");
             if (!ServiceRunning()) return new(DependencyState.Stopped, "—", "Service npcap arrêté. Réparez l’installation depuis npcap.com.");
             var handle = NativeLibrary.Load(library);
@@ -42,7 +43,7 @@ public sealed class NpcapPlatform : IDependencyPlatform
             }
             finally { NativeLibrary.Free(handle); }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException or DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or Win32Exception)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException or DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or Win32Exception or FormatException or OverflowException or InvalidCastException)
         { return new(DependencyState.Unavailable, "—", "État ou API Npcap inaccessible. Vérifiez l’installation et les droits du compte."); }
     }
     public async Task DownloadAsync(string path, IProgress<InstallProgress> progress, CancellationToken ct)

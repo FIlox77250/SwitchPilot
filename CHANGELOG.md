@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.6 — 30 septembre 2026
+
+Corrections issues d'un audit complet du code (10 analyses parallèles), centrées sur la connexion switch.
+
+- **Allied Telesis — table MAC** : la sortie réelle `VLAN port mac fwd` (port avant la MAC, colonne de forwarding, type en dernier) est désormais parsée par `AlliedTelesisParser.Macs`. La réutilisation du parseur Cisco faisait échouer toute détection sur un vrai switch Allied.
+- **Console — invite de connexion Allied** : les invites `login as:` et `awplus login:` sont reconnues (et non plus seulement `Username:`/`login:`), avec envoi d'un identifiant vide pour les consoles anonymes. C'était un blocage certain de la connexion COM.
+- **Syslogs AlliedWare Plus** : les lignes horodatées `… local0.notice …` (sans `%`) sont retirées comme les syslogs Cisco, sinon le prompt n'était plus détecté après une annonce asynchrone, en SSH comme en console.
+- **Détection du constructeur** : un switch Allied n'est plus envoyé au pilote Cisco quand la bannière est ambiguë (essai des deux familles).
+- **SSH `keyboard-interactive`** : le mot de passe est prioritaire ; un prompt « Password for user: » ne reçoit plus le login.
+- **Allied — trunks et descriptions** : `switchport trunk allowed vlan none` puis `add <liste>` (forme AW+ valide) au lieu de la forme Cisco ; description limitée à 80 caractères.
+- **Allied — VLANs** : les lignes de continuation (ports wrappés) sont prises en compte, un trunk n'est plus classé `access`.
+- **Allied — modèle** lu depuis `show system` ; commande `show interface description` (inexistante en AW+) supprimée.
+- **Cisco** : la lecture des VLANs ne fait plus échouer tout l'inventaire ; `Port-channel1` reconnu dans la table MAC ; comparaisons trunk insensibles à la casse ; modèles Catalyst récents reconnus ; fraîcheur TDR corrigée.
+- **Réseau** : la preuve de route directe ne rejette plus une réponse DNS contenant de l'IPv6.
+- **Terminal** : l'élévation privilégiée ne se déclenche qu'en cas de refus d'autorisation et n'efface plus l'erreur d'origine.
+- **Dépendances Npcap** : `InvalidDataException` gérée (plus de boîte « erreur inattendue »), valeur de registre défensive, nettoyage qui ne masque plus le résultat, refus UAC distinct.
+- **Mise à jour** : redirections revalidées par saut (`AllowAutoRedirect=false`), timeout d'inactivité sur le corps, relance dans le bon dossier, attente du PID bornée, `CanInstall` sans I/O disque à chaque requête, version affichée à 3 composants.
+- **Docs/version** : source de version unique (le script PowerShell lit `Directory.Build.props`), références 1.0.2 corrigées, description `IsDirectRoute` et « PTY » rectifiées.
+
 ## 1.0.5 — 30 septembre 2026
 
 - Détection automatique du constructeur à la connexion (`show version`) : le pilote Cisco IOS ou Allied Telesis est choisi sans intervention, en SSH comme en console. Le sélecteur « Détection automatique » est désormais l’option par défaut ; un mauvais choix envoyait les mauvaises commandes et faisait échouer les deux transports de la même façon.

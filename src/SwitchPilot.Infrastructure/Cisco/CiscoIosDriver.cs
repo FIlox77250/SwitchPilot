@@ -38,7 +38,9 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
             ports = ports.Select(p => p with { Mode = modes.GetValueOrDefault(p.Name, p.Mode) }).ToArray();
         }
         catch (CliException) { audit.Write("Lecture des modes", "Non autorisée ou non prise en charge ; modes inconnus conservés."); }
-        var vlans = CiscoParser.Vlans(await session.ExecuteAsync("show vlan brief", ct));
+        IReadOnlyList<VlanInfo> vlans;
+        try { vlans = CiscoParser.Vlans(await session.ExecuteAsync("show vlan brief", ct)); }
+        catch (FormatException) { vlans = []; audit.Write("Lecture des VLAN", "Format non reconnu ; liste vide."); }
         lastSnapshot = new(info, ports, vlans);
         return lastSnapshot;
     }
@@ -177,7 +179,7 @@ public sealed class CiscoIosDriver(ICliSession session, IAuditSink audit, TimeSp
                 var stamp = Regex.Match(output, @"TDR test last run on:\s*([^\r\n]+)").Groups[1].Value;
                 var pending = result.Pairs.Any(p => p.Status is "Non terminé" or "En cours");
                 observedPending |= pending;
-                var fresh = stamp.Length > 0 && stamp != oldStamp || observedPending;
+                var fresh = stamp.Length > 0 ? stamp != oldStamp : observedPending;
                 if (fresh && result.Pairs.Count > 0 && !pending)
                 { audit.Write($"TDR {port}", "Résultats reçus."); return result; }
             }

@@ -7,7 +7,7 @@ public record PortInfo(string Name, string Description, string Status, string Vl
     public string StateLabel => Status switch { "connected" => "Actif", "notconnect" => "Débranché", "disabled" => "Désactivé", "err-disabled" => "Erreur", _ => Status };
     public string SpeedLabel => Speed.Replace("a-", "") is var s && int.TryParse(s, out _) ? s + " Mb/s" : Speed;
     public string DuplexLabel => Duplex.Replace("a-", "");
-    public bool IsTrunk => Mode == "trunk" || Vlan == "trunk";
+    public bool IsTrunk => Mode.Equals("trunk", StringComparison.OrdinalIgnoreCase) || Vlan.Equals("trunk", StringComparison.OrdinalIgnoreCase);
     public override string ToString() => Name;
 }
 public record VlanInfo(int Id, string Name, string Status, string Ports);

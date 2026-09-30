@@ -57,8 +57,8 @@ public sealed class DependencyInstaller(IDependencyPlatform platform)
         {
             // Cleanup must never mask the install result: a locked file or a lingering
             // helper process must not turn a successful install into an exception.
-            try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { }
-            try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            try { if (File.Exists(path)) File.Delete(path); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+            try { Directory.Delete(directory, recursive: true); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
         }
     }
 }

@@ -38,6 +38,20 @@ public class SerialTests
         channel.AfterPrompt = true;
         Assert.Contains("100", await cli.CommandAsync("show interfaces Fa0/1", default));
     }
+    [Fact] public async Task AlliedSyslogAfterPromptDoesNotCauseTimeout()
+    {
+        var terminal = new AlliedConsole { AlliedLog = true };
+        var cli = new CliConversation(terminal); await cli.InitializeConsoleAsync(Profile, default);
+        Assert.Contains("100", await cli.CommandAsync("show interfaces Fa0/1", default));
+    }
+    [Fact] public async Task AlliedConsoleLoginAsIsAnswered()
+    {
+        var terminal = new AlliedConsole();
+        await using var session = await SerialSession.ConnectAsync(Profile, default, (_, _) => terminal);
+        Assert.True(session.IsConnected);
+        Assert.Contains("tech\n", terminal.Sent);
+        Assert.Contains("test-password\n", terminal.Sent);
+    }
     [Fact] public void SerialProfileCannotInjectTerminalControls() => Assert.Throws<ArgumentException>(() => (Profile with { Password = "bad\nreload" }).Validate());
     [Fact] public void SerialProfileStringDoesNotExposeCredentials() => Assert.Equal("Console COM3 · 9600", Profile.ToString());
     private sealed class Emulator(string initial) : ITerminalChannel
@@ -57,6 +71,25 @@ public class SerialTests
             else if (state == "Password:" && text == "test-password\n") state = "SW#";
             else if (text == "end\n") state = "SW#";
             pending.Enqueue(text.StartsWith("show ") ? text + "\n*Mar 1 00:00:01: %LINK-3-UPDOWN: Interface Fa0/2\nFull-duplex, 100Mb/s\nSW#" + (AfterPrompt ? "\n%SYS-5-CONFIG_I: Configured from console\n" : "") : state);
+        }
+        public void Dispose() => IsOpen = false;
+    }
+    private sealed class AlliedConsole : ITerminalChannel
+    {
+        private readonly Queue<string> pending = new(["login as: "]);
+        private string state = "login";
+        public bool AlliedLog;
+        public List<string> Sent { get; } = [];
+        public bool IsOpen { get; private set; } = true;
+        public string ReadAvailable() => pending.TryDequeue(out var chunk) ? chunk : "";
+        public void Send(string text)
+        {
+            Sent.Add(text);
+            if (state == "login" && text == "tech\n") { state = "password"; pending.Enqueue("Password: "); }
+            else if (state == "password" && text == "test-password\n") { state = "ready"; pending.Enqueue("awplus#"); }
+            else if (state == "ready" && text.StartsWith("show "))
+                pending.Enqueue("Full-duplex, 100Mb/s\nawplus#" + (AlliedLog ? "\n03:17:10 awplus local0.notice AWPLUS[42]: allied log line\n" : ""));
+            else if (state == "ready" && text.Length > 0) pending.Enqueue("awplus#");
         }
         public void Dispose() => IsOpen = false;
     }

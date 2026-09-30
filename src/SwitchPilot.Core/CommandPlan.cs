@@ -44,7 +44,7 @@ public sealed class CommandPlan
         ValidateVlan(vlan);
         return PortPlan(ChangeKind.AccessVlan, $"Affecter {port} au VLAN {vlan}", port, vlan, null, "switchport mode access", $"switchport access vlan {vlan}");
     }
-    public static CommandPlan Trunk(string port, int native, string allowed)
+    public static CommandPlan Trunk(string port, int native, string allowed, SwitchVendor vendor = SwitchVendor.Cisco)
     {
         ValidateVlan(native);
         var ids = new SortedSet<int>();
@@ -62,13 +62,18 @@ public sealed class CommandPlan
         allowed = string.Join(',', canonical);
         // Keep IOS command lines bounded; caller can use compact ranges.
         if (allowed.Length > 180) throw new ArgumentException("Liste de VLAN trop longue (180 caractères maximum).");
-        return PortPlan(ChangeKind.Trunk, $"Configurer {port} en trunk", port, native, allowed, $"switchport trunk native vlan {native}", $"switchport trunk allowed vlan {allowed}", "switchport mode trunk");
+        // AlliedWare Plus has no plain allowed-vlan list form: reset then add.
+        return vendor == SwitchVendor.AlliedTelesis
+            ? PortPlan(ChangeKind.Trunk, $"Configurer {port} en trunk", port, native, allowed,
+                "switchport mode trunk", $"switchport trunk native vlan {native}", "switchport trunk allowed vlan none", $"switchport trunk allowed vlan add {allowed}")
+            : PortPlan(ChangeKind.Trunk, $"Configurer {port} en trunk", port, native, allowed, $"switchport trunk native vlan {native}", $"switchport trunk allowed vlan {allowed}", "switchport mode trunk");
     }
     public static CommandPlan Enabled(string port, bool enabled) => PortPlan(enabled ? ChangeKind.EnablePort : ChangeKind.DisablePort,
         $"{(enabled ? "Activer" : "Désactiver")} {port}", port, null, null, enabled ? "no shutdown" : "shutdown");
-    public static CommandPlan Describe(string port, string description)
+    public static CommandPlan Describe(string port, string description, SwitchVendor vendor = SwitchVendor.Cisco)
     {
-        var text = Text(description, 200, true);
+        // AlliedWare Plus limits a port description to 80 characters.
+        var text = Text(description, vendor == SwitchVendor.AlliedTelesis ? 80 : 200, true);
         return PortPlan(ChangeKind.Description, $"Description de {port}", port, null, text, text.Length == 0 ? "no description" : $"description {text}");
     }
     public static CommandPlan CreateVlan(int id, string name)

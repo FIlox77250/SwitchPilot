@@ -29,6 +29,12 @@ public sealed class CliConversation(ITerminalChannel channel)
     private static readonly Regex Error = new(@"(?im)^[ \t]*(?:%(?![A-Z0-9_]+-\d-[A-Z0-9_]+:)[^\n]+|(?:Command rejected|Not allowed|Command authorization failed|Authorization failed|Access denied|Permission denied|Cannot (?:modify|create|delete)[^\n]*VLAN|(?:VTP|VLAN configuration)[^\n]*(?:client|not allowed)|(?:TDR|Cable diagnostics?)\b[^\n]*(?:not supported|not allowed))[^\n]*)$");
     private static readonly Regex PasswordPrompt = new(@"(?i)password:\s*$");
     private static readonly Regex Confirmation = new(@"(?i)(\[confirm\]|\[yes/no\]|\(y/n\)):?\s*$");
+    // AlliedWare Plus consoles announce "awplus login:" or "login as:"; Cisco uses "Username:".
+    private static readonly Regex LoginPrompt = new(@"(?i)(?:^|\n)\s*(?:[A-Za-z0-9_.-]+\s+)?(?:Username|User\s*Name|Login\s*Name|login(?:\s+as)?)\s*:\s*$");
+    private static readonly Regex PressKey = new(@"(?i)(?:^|\n)\s*Press\s+(?:RETURN|Enter|any key|<Enter>)[^\r\n]*$");
+    private static readonly Regex CiscoSyslog = new(@"(?m)^(?:\*?[A-Za-z]{3}\s+\d+[^\r\n%]*:\s*)?%[A-Z0-9_]+-\d-[A-Z0-9_]+:[^\r\n]*(?:\n|$)");
+    // AlliedWare Plus logs are timestamped <time> <host> <facility>.<severity> ... with no '%'.
+    private static readonly Regex AlliedSyslog = new(@"(?m)^\s*(?:[A-Z][a-z]{2}\s+\d{1,2}\s+)?\d{2}:\d{2}:\d{2}\s+(?:\S+\s+)?[a-z][a-z0-9]*\.(?:emerg|alert|crit|err|error|warning|notice|info|debug)\b[^\r\n]*(?:\n|$)");
 
     public async Task InitializeAsync(CancellationToken ct)
     {
@@ -90,8 +96,7 @@ public sealed class CliConversation(ITerminalChannel channel)
         if (lines.Count > 0 && lines[0].Trim() == command) lines.RemoveAt(0);
         return string.Join('\n', lines);
     }
-    private static string StripSyslog(string text) => Regex.Replace(text,
-        @"(?m)^(?:\*?[A-Za-z]{3}\s+\d+[^\r\n%]*:\s*)?%[A-Z0-9_]+-\d-[A-Z0-9_]+:[^\r\n]*(?:\n|$)", "");
+    private static string StripSyslog(string text) => CiscoSyslog.Replace(AlliedSyslog.Replace(text, ""), "");
     private async Task<string> ReceiveAsync(bool allowPassword, CancellationToken ct, ConnectionProfile? console = null)
     {
         var timer = Stopwatch.StartNew();
@@ -113,13 +118,15 @@ public sealed class CliConversation(ITerminalChannel channel)
             if (console is not null)
             {
                 string? answer = null;
-                if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*Press RETURN to get started[.!]?\s*$") && !returnSent)
+                if (PressKey.IsMatch(tail) && !returnSent)
                 { answer = "\n"; returnSent = true; }
                 else if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*Would you like to enter the initial configuration dialog\? \[yes/no\]:?\s*$") && !initialAnswered)
                 { answer = "no\n"; initialAnswered = true; }
-                else if (Regex.IsMatch(tail, @"(?i)(?:^|\n)\s*(?:Username|login):\s*$"))
+                else if (LoginPrompt.IsMatch(tail))
                 {
-                    if (loginSent || console.Username.Length == 0) throw new CliException("Identifiant console requis ou authentification refusée.", CliFailure.Authorization);
+                    if (loginSent) throw new CliException("Identifiant console refusé ou authentification requise.", CliFailure.Authorization);
+                    // Some consoles accept an anonymous login; send even an empty name instead
+                    // of aborting before the switch had a chance to respond.
                     answer = console.Username + "\n"; loginSent = true;
                 }
                 else if (PasswordPrompt.IsMatch(tail))

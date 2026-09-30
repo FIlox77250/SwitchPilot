@@ -1,10 +1,10 @@
-# Switch Pilot 1.0.5
+# Switch Pilot 1.0.6
 
 Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.5/SwitchPilot.exe) · [Release v1.0.5 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.5)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.6/SwitchPilot.exe) · [Release v1.0.6 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.6)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
@@ -96,7 +96,7 @@ python -m venv .tools/integration-venv
 .tools/integration-venv/bin/python tests/ssh_emulator.py
 ```
 
-Sous Windows, utiliser `.tools/integration-venv/Scripts/python`. L’émulateur SSH écoute uniquement sur loopback avec des identifiants fictifs ; sous Linux il lance également deux consoles PTY pour exercer le véritable canal `System.IO.Ports`. Les tests dépendants d’un émulateur ou de Windows sont explicitement ignorés quand leur environnement manque.
+Sous Windows, utiliser `.tools/integration-venv/Scripts/python`. L’émulateur SSH écoute uniquement sur loopback avec des identifiants fictifs ; sous Linux il lance également un pseudo-terminal PTY pour exercer le véritable canal `System.IO.Ports`. Les tests dépendants d’un émulateur ou de Windows sont explicitement ignorés quand leur environnement manque.
 
 La CI `.github/workflows/windows.yml` comprend un smoke test de l’exécutable publié sous un compte standard. Ce parcours charge `System.IO.Ports`, énumère les ports et teste les fenêtres ainsi que DPAPI. **La compilation Linux et les tests PTY ne valident pas le fonctionnement d’un adaptateur COM sous Windows dans le bundle final.** Voir [VALIDATION.md](docs/VALIDATION.md) pour les vérifications effectuées et la recette restante.
 
@@ -111,4 +111,4 @@ L’exécutable livré n’est pas signé. Republier lors des mises à jour de s
 
 Un autre constructeur peut implémenter `ISwitchDriver` ; les transports partagent `ICliSession` et `ITerminalChannel`. La conversation sérialise les échanges, traite les prompts/pagination/syslogs, borne les réponses et ferme une session désynchronisée après délai, annulation ou confirmation inattendue.
 
-Les [mesures de performance historiques 1.0.1](docs/PERFORMANCE.md) restent disponibles ; elles ne sont pas des mesures de la 1.0.2.
+Les [mesures de performance historiques 1.0.1](docs/PERFORMANCE.md) restent disponibles ; elles ne sont pas des mesures de la 1.0.6.

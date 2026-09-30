@@ -41,7 +41,7 @@ public static class CiscoParser
             if (!m.Success) continue;
             var vlan = m.Groups["vlan"].Value;
             result.Add(new(NormalizeInterface(m.Groups["port"].Value), m.Groups["name"].Value.Trim(), m.Groups["state"].Value.ToLowerInvariant(), vlan,
-                m.Groups["duplex"].Value, m.Groups["speed"].Value, m.Groups["type"].Value.Trim(), vlan == "trunk" ? "trunk" : "Inconnu"));
+                m.Groups["duplex"].Value, m.Groups["speed"].Value, m.Groups["type"].Value.Trim(), vlan.Equals("trunk", StringComparison.OrdinalIgnoreCase) ? "trunk" : "Inconnu"));
         }
         if (result.Count == 0) throw new FormatException("Aucun port reconnu dans « show interfaces status ». Format IOS inattendu ou autorisation insuffisante.");
         return result;
@@ -63,7 +63,7 @@ public static class CiscoParser
             if (line.StartsWith("Administrative Mode: "))
             {
                 var mode = line[21..].Trim();
-                result[port] = mode.Contains("trunk") ? "trunk" : mode.Contains("access") ? "access" : mode;
+                result[port] = mode.Contains("trunk", StringComparison.OrdinalIgnoreCase) ? "trunk" : mode.Contains("access", StringComparison.OrdinalIgnoreCase) ? "access" : mode;
             }
         }
         return result;
@@ -88,7 +88,7 @@ public static class CiscoParser
             string mac;
             try { mac = NormalizeMac(m.Groups[2].Value); } catch (ArgumentException) { continue; }
             foreach (var port in m.Groups[4].Value.Split([',', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries))
-                if (Regex.IsMatch(port, @"^(?:(?:Fa|Gi|Te|Po)\w*[-]?\d|(?:port)?\d+\.\d+)", RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(port, @"^(?:(?:Fa|Gi|Te|Po|FastEthernet|GigabitEthernet|TenGigabitEthernet|Port-channel)\S*\d|(?:port)?\d+\.\d+)", RegexOptions.IgnoreCase))
                     result.Add(new(vlan, mac, m.Groups[3].Value.ToUpperInvariant(), NormalizeInterface(port)));
         }
         if (result.Count == 0 && !Regex.IsMatch(output, @"Mac Address Table|Mac Address-Table|Total Mac Addresses|No entries|Vlan\s+Mac Address", RegexOptions.IgnoreCase))
@@ -109,7 +109,8 @@ public static class CiscoParser
     }
     public static SwitchIdentity Identity(string hostname, string version)
     {
-        var model = Regex.Match(version, @"(?:Model [Nn]umber\s*:\s*|cisco\s+)(WS-C[\w+-]+)", RegexOptions.IgnoreCase);
+        var model = Regex.Match(version, @"Model [Nn]umber\s*:\s*(\S+)", RegexOptions.IgnoreCase);
+        if (!model.Success) model = Regex.Match(version, @"\bcisco\s+((?:WS-C|C|IE|N|ISR|ASR|ME|CBS)[\w.+-]+)", RegexOptions.IgnoreCase);
         var ios = Regex.Match(version, @"\bVersion\s+([^,\s]+)");
         return new(hostname, model.Success ? model.Groups[1].Value : "Cisco IOS (modèle inconnu)", ios.Success ? ios.Groups[1].Value : "Inconnue");
     }

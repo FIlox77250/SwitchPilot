@@ -49,7 +49,9 @@ public sealed class GitHubUpdateSource(string owner, string repository, string a
 
     private HttpClient CreateClient()
     {
-        var client = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
+        // AllowAutoRedirect=false so every hop of the release download is re-validated against
+        // the host allow-list below; otherwise the manual redirect loop is never exercised.
+        var client = handler is null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) : new HttpClient(handler, disposeHandler: false);
         client.Timeout = TimeSpan.FromSeconds(30);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("SwitchPilot-Updater/1.0 (+https://github.com/" + owner + "/" + repository + ")");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
@@ -155,9 +157,18 @@ public sealed class GitHubUpdateSource(string owner, string repository, string a
             await using var input = await response.Content.ReadAsStreamAsync(ct);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 131072, useAsync: true);
-            var buffer = new byte[131072]; long count = 0; int read;
-            while ((read = await input.ReadAsync(buffer, ct)) > 0)
+            var buffer = new byte[131072]; long count = 0;
+            // ResponseHeadersRead means HttpClient.Timeout only covers the headers, so guard the
+            // body with an inactivity timeout; abort a stalled transfer instead of hanging.
+            using var inactivity = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            inactivity.CancelAfter(TimeSpan.FromSeconds(60));
+            while (true)
             {
+                int read;
+                try { read = await input.ReadAsync(buffer, inactivity.Token); }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new IOException("Téléchargement interrompu : aucune donnée reçue pendant 60 secondes."); }
+                if (read == 0) break;
+                inactivity.CancelAfter(TimeSpan.FromSeconds(60));
                 count += read;
                 if (count > MaxAssetSize) throw new InvalidDataException("Mise à jour trop volumineuse.");
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);

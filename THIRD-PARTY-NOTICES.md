@@ -2,7 +2,7 @@
 
 Switch Pilot utilise des composants non modifiés. Les versions exactes et dépendances transitives sont consignées dans les fichiers `packages.lock.json`.
 
-| Composant | Version dans Switch Pilot 1.0.2 | Licence / source |
+| Composant | Version dans Switch Pilot 1.0.6 | Licence / source |
 | --- | --- | --- |
 | .NET Runtime et Windows Desktop / WPF | 10.0.12 | [MIT, notices runtime](https://github.com/dotnet/runtime/blob/v10.0.12/THIRD-PARTY-NOTICES.TXT), [WPF](https://github.com/dotnet/wpf) |
 | SSH.NET | 2026.0.0 | MIT, Copyright © Renci 2010–2026, [source](https://github.com/sshnet/SSH.NET) |

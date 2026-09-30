@@ -8,10 +8,13 @@ namespace SwitchPilot.Infrastructure.Updates;
 /// portable executable and restarts it. Windows locks the image of a running EXE,
 /// so the swap is delegated to a short batch script that waits for our PID.
 /// </summary>
-public sealed class UpdateInstaller
+public sealed class UpdateInstaller(string? stagingDirectory = null)
 {
     /// <summary>Directory used for the downloaded binary and the apply script.</summary>
-    public static string StagingDirectory => Path.Combine(Path.GetTempPath(), "SwitchPilot-Update");
+    public static string DefaultStagingDirectory => Path.Combine(Path.GetTempPath(), "SwitchPilot-Update");
+
+    /// <summary>Actual staging directory; overridable in tests so they never touch the real one.</summary>
+    public string StagingDirectory { get; } = stagingDirectory ?? DefaultStagingDirectory;
 
     /// <summary>Path of the running portable executable, or null when hosted outside the app (e.g. `dotnet run`).</summary>
     public static string? CurrentExecutable => Environment.ProcessPath;
@@ -46,7 +49,8 @@ public sealed class UpdateInstaller
         var directory = Path.GetDirectoryName(target);
         if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) throw new DirectoryNotFoundException("Dossier de l'application introuvable.");
         var image = Path.GetFileName(target);
-        foreach (var value in new[] { target, source, image })
+        var targetDirectory = Path.GetDirectoryName(target) ?? directory;
+        foreach (var value in new[] { target, source, image, targetDirectory })
             if (value.Any(c => c is '"' or '\r' or '\n' or '%' or '&' or '|' or '<' or '>' or '^' || c < ' '))
                 throw new InvalidOperationException("Chemin de mise à jour non pris en charge.");
         Directory.CreateDirectory(StagingDirectory);
@@ -54,9 +58,12 @@ public sealed class UpdateInstaller
         var content =
             "@echo off\r\n" +
             "setlocal enableextensions\r\n" +
+            "set /a waited=0\r\n" +
             ":wait\r\n" +
             $"tasklist /FI \"PID eq {Environment.ProcessId}\" /NH 2>nul | findstr /I /B /C:\"{image}\" >nul\r\n" +
             "if not errorlevel 1 (\r\n" +
+            "  set /a waited+=1\r\n" +
+            "  if %waited% GEQ 120 goto launch\r\n" +
             "  >nul ping -n 2 127.0.0.1\r\n" +
             "  goto wait\r\n" +
             ")\r\n" +
@@ -69,7 +76,7 @@ public sealed class UpdateInstaller
             ">nul ping -n 1 127.0.0.1\r\n" +
             "goto retry\r\n" +
             ":launch\r\n" +
-            $"if exist \"{target}\" start \"\" \"{target}\"\r\n" +
+            $"if exist \"{target}\" start \"\" /D \"{targetDirectory}\" \"{target}\"\r\n" +
             $"del /F /Q \"{source}\" >nul 2>&1\r\n" +
             "del /F /Q \"%~f0\" >nul 2>&1\r\n";
         File.WriteAllText(script, content, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));

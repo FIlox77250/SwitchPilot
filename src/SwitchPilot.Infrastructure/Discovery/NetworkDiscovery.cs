@@ -21,21 +21,32 @@ public static class NetworkDiscovery
         // A routed management session can traverse an access uplink different from the
         // port learning our MAC. Only a proven direct IPv4 route authorizes destructive TDR.
         if (!OperatingSystem.IsWindows()) return false;
-        var addresses = await Dns.GetHostAddressesAsync(host, ct);
+        IPAddress[] addresses;
+        try { addresses = await Dns.GetHostAddressesAsync(host, ct); }
+        catch (Exception e) when (e is SocketException or ArgumentException) { return false; }
+        // A dual-stack name also returns AAAA records; ignore them instead of failing the proof.
+        var ipv4 = addresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork).ToArray();
+        if (ipv4.Length == 0) return false;
         var local = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(n => n.Id == adapter.Id);
         if (local is null || local.OperationalStatus != OperationalStatus.Up) return false;
         var ips = local.GetIPProperties().UnicastAddresses.Select(a => a.Address).ToHashSet();
-        if (addresses.Length == 0) return false;
-        foreach (var address in addresses)
+        uint interfaceIndex;
+        try
         {
-            if (address.AddressFamily != AddressFamily.InterNetwork) return false;
+            var properties = local.GetIPProperties().GetIPv4Properties();
+            if (properties is null) return false;
+            interfaceIndex = (uint)properties.Index;
+        }
+        catch (NetworkInformationException) { return false; }
+        foreach (var address in ipv4)
+        {
             try
             {
-                using var socket = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
                 socket.Connect(new IPEndPoint(address, 22));
                 if (socket.LocalEndPoint is not IPEndPoint endpoint || !ips.Contains(endpoint.Address)) return false;
                 var code = GetBestRoute(BitConverter.ToUInt32(address.GetAddressBytes()), BitConverter.ToUInt32(endpoint.Address.GetAddressBytes()), out var route);
-                if (code != 0 || !IsDirectRoute(route.Type, route.InterfaceIndex, (uint)local.GetIPProperties().GetIPv4Properties().Index)) return false;
+                if (code != 0 || !IsDirectRoute(route.Type, route.InterfaceIndex, interfaceIndex)) return false;
             }
             catch (SocketException) { return false; }
         }

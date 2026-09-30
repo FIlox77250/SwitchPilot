@@ -55,6 +55,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public string ModeLabel => DryRun ? "Simulation activée" : "Modifications réelles activées";
     public bool Connected => driver?.IsConnected == true;
     public bool IsDemo => driver?.IsDemo == true;
+    private SwitchVendor ActiveVendor => driver?.Vendor ?? SwitchVendor.Cisco;
     public string Status { get => status; private set => Set(ref status, value); }
     public string Connection { get => connection; private set => Set(ref connection, value); }
     public string Model { get => model; private set => Set(ref model, value); }
@@ -139,10 +140,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         RefreshAdaptersCommand = new RelayCommand(RefreshAdapters, () => !IsBusy && !IsDemo);
         ViewPortCommand = new RelayCommand(() => { SelectedPort = Ports.FirstOrDefault(p => p.Name == ResultPort); Tab = 1; }, () => Ports.Any(p => p.Name == ResultPort));
         AccessCommand = Change(() => CommandPlan.Access(SelectedPort!.Name, ParseVlan()), CanEditPort);
-        TrunkCommand = Change(() => CommandPlan.Trunk(SelectedPort!.Name, int.Parse(NativeVlan), AllowedVlans), CanEditPort);
+        TrunkCommand = Change(() => CommandPlan.Trunk(SelectedPort!.Name, int.Parse(NativeVlan), AllowedVlans, ActiveVendor), CanEditPort);
         EnableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, true), CanEditPort);
         DisableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, false), CanEditPort);
-        DescriptionCommand = Change(() => CommandPlan.Describe(SelectedPort!.Name, Description), CanEditPort);
+        DescriptionCommand = Change(() => CommandPlan.Describe(SelectedPort!.Name, Description, ActiveVendor), CanEditPort);
         CreateVlanCommand = Change(() => CommandPlan.CreateVlan(ParseVlan(), VlanName), CanRead);
         DeleteVlanCommand = Change(() => CommandPlan.DeleteVlan(SelectedVlan!.Id), () => CanRead() && SelectedVlan != null);
         SaveCommand = Change(CommandPlan.Save, CanRead);
@@ -245,36 +246,50 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 legacy = true;
                 session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, true, ct), ct);
             }
-            var vendor = selected.Vendor;
+            var detected = (SwitchVendor?)null;
             if (selected.AutoDetectVendor)
             {
-                try
-                {
-                    // Detect from the banner so the wrong driver (Cisco vs Allied) cannot make
-                    // both SSH and console fail with the same wrong read commands.
-                    if (SwitchVendorDetector.Detect(await session.ExecuteAsync("show version", ct)) is { } detected) vendor = detected;
-                }
-                catch (CliException) { /* Fall back to the explicit selection. */ }
+                try { detected = SwitchVendorDetector.Detect(await session.ExecuteAsync("show version", ct)); }
+                catch (CliException) { /* Inconclusive: try both families below. */ }
             }
-            driver = vendor == SwitchVendor.AlliedTelesis
-                ? new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath))
-                : new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
+            // Auto-detect: trust a conclusive banner, otherwise probe both command sets in turn
+            // rather than defaulting to Cisco, so a wrong family cannot fail on both transports.
+            var order = !selected.AutoDetectVendor ? new[] { selected.Vendor }
+                : detected is { } only ? new[] { only }
+                : new[] { SwitchVendor.Cisco, SwitchVendor.AlliedTelesis };
             profile = selected with { Password = "", EnablePassword = "" };
             store.SaveProfile(selected);
             selected = selected with { Password = "", EnablePassword = "" };
+            var vendor = order[0];
+            Exception? readError = null;
+            foreach (var candidate in order)
+            {
+                vendor = candidate;
+                driver = CreateDriver(session, candidate);
+                try { await Refresh(ct); await Detect(ct); readError = null; break; }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e)
+                {
+                    readError = e;
+                    if (!session.IsConnected || order.Length == 1) break;
+                    audit.Write("Détection du constructeur", $"Lecture impossible avec {(candidate == SwitchVendor.AlliedTelesis ? "Allied Telesis" : "Cisco IOS")} : {e.GetType().Name}.");
+                }
+            }
             audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité ancien IOS" : "Connecté") + $" · {(vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis" : "Cisco IOS")}.");
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
-            try { await Refresh(ct); await Detect(ct); }
-            catch (Exception e) when (e is not OperationCanceledException)
+            if (readError is not null)
             {
                 // A read failure must not look like a login failure: keep the session open and
                 // state exactly what could not be read so the user can retry or adjust.
                 Model = vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis · AlliedWare Plus" : "Cisco IOS";
                 Connection = session.Hostname + " · connecté";
-                Status = "Connecté, mais la lecture de l'état a échoué : " + FriendlyError(e);
+                Status = "Connecté, mais la lecture de l'état a échoué : " + FriendlyError(readError);
             }
         });
     }
+    private ISwitchDriver CreateDriver(ICliSession session, SwitchVendor vendor) => vendor == SwitchVendor.AlliedTelesis
+        ? new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath))
+        : new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
     private bool Trust(string host, string fingerprint) => dispatcher.Invoke(() =>
     {
         var known = store.KnownFingerprint(host);
