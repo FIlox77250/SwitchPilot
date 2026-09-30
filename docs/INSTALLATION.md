@@ -1,10 +1,10 @@
-# Installer Switch Pilot 1.0.2
+# Installer Switch Pilot 1.0.3
 
 Switch Pilot est portable pour Windows x64. Le runtime .NET/WPF est inclus : aucune installation de runtime n’est nécessaire.
 
 ## Télécharger et lancer
 
-1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.2](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.2). L’archive `SwitchPilot-1.0.2-win-x64.zip` ajoute la documentation et les licences.
+1. Télécharger `SwitchPilot.exe` et `SHA256SUMS.txt` depuis la [release officielle v1.0.3](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.3). L’archive `SwitchPilot-1.0.3-win-x64.zip` ajoute la documentation et les licences.
 2. Extraire l’archive, si nécessaire, dans un dossier utilisateur, par exemple `Documents\SwitchPilot`.
 3. Vérifier le téléchargement avec `Get-FileHash .\SwitchPilot.exe -Algorithm SHA256` et comparer au fichier de sommes.
 4. Lancer `SwitchPilot.exe` par double-clic, sans « Exécuter en tant qu’administrateur ».
@@ -32,7 +32,7 @@ Le port, le VLAN annoncé, la source et l’heure apparaissent dès réception. 
 
 ## Connexion SSH
 
-1. Choisir **Connecter un switch → SSH**.
+1. Choisir **Connecter un switch**, puis le **constructeur** (Cisco IOS ou Allied Telesis · AlliedWare Plus) et le mode **SSH**.
 2. Saisir l’adresse, le port, l’utilisateur, le mot de passe et éventuellement le secret `enable`.
 3. Vérifier l’empreinte SSH. Une clé nouvelle ou changée demande une confirmation.
 4. En cas d’incompatibilité de négociation, accepter la proposition « ancien IOS » uniquement pour l’équipement concerné.
@@ -57,5 +57,9 @@ Le TDR est manuel par défaut et peut couper le lien. En SSH, le port du poste e
 Consulter l’historique dans **Diagnostics**, ou **Comparer à une sauvegarde** pour afficher côte à côte une sauvegarde déchiffrée en mémoire et la configuration actuelle.
 
 Les paramètres restent dans `%APPDATA%\SwitchPilot`. Les identifiants mémorisés et les configurations sont protégés par DPAPI pour ce compte Windows.
+
+## Mises à jour
+
+Au lancement, Switch Pilot interroge les releases GitHub du projet et propose d’installer une version plus récente. Le téléchargement reprend l’exécutable portable, son empreinte SHA-256 est vérifiée, puis il est remplacé au redémarrage. **Paramètres → Vérifier les mises à jour** relance la recherche ; « Ne plus proposer cette version » évite une relance pour une version donnée. La mise à jour automatique suppose un dossier d’installation accessible en écriture ; sinon l’application renvoie vers la page GitHub.
 
 Pour les incidents et les limites de validation : [annexe dépannage](TROUBLESHOOTING.md) et [rapport de validation](VALIDATION.md).

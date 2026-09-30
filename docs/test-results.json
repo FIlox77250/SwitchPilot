@@ -1,62 +1,45 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
-  "integration": {
-    "total": 162,
-    "executed": 156,
-    "passed": 156,
-    "failed": 0,
-    "skipped": 6,
-    "timing": {
-      "creation": "2026-09-30T12:32:01.6698717+02:00",
-      "queuing": "2026-09-30T12:32:01.6698718+02:00",
-      "start": "2026-09-30T12:32:01.2045379+02:00",
-      "finish": "2026-09-30T12:32:09.2330142+02:00"
-    },
-    "skipped_tests": [
-      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
-      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
-      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
-      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
-      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable",
-      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
-    ]
-  },
   "regression": {
-    "total": 162,
-    "executed": 146,
-    "passed": 146,
+    "total": 191,
+    "executed": 174,
+    "passed": 174,
     "failed": 0,
-    "skipped": 16,
+    "skipped": 17,
     "timing": {
-      "creation": "2026-09-30T12:34:10.6991780+02:00",
-      "queuing": "2026-09-30T12:34:10.6991781+02:00",
-      "start": "2026-09-30T12:34:10.2278784+02:00",
-      "finish": "2026-09-30T12:34:16.1589767+02:00"
+      "creation": "2026-09-30T16:15:36.6397369+02:00",
+      "queuing": "2026-09-30T16:15:36.6397369+02:00",
+      "start": "2026-09-30T16:15:36.1366680+02:00",
+      "finish": "2026-09-30T16:15:42.0350586+02:00"
     },
     "skipped_tests": [
       "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
-      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
-      "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
-      "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
-      "SwitchPilot.Tests.SshIntegrationTests.CancellationClosesSessionAndDisposeIsIdempotent",
-      "SwitchPilot.Tests.SshIntegrationTests.RealSshTransportReadsAndConfiguresEmulatedIos",
-      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
-      "SwitchPilot.Tests.SshIntegrationTests.LegacyAlgorithmsRequireExplicitRetry",
-      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
       "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelHandlesFragmentedOutputAndSyslog",
-      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode",
-      "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
+      "SwitchPilot.Tests.SshIntegrationTests.CancellationClosesSessionAndDisposeIsIdempotent",
       "SwitchPilot.Tests.SshIntegrationTests.ConcurrentCommandsDoNotMixResponses",
-      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
+      "SwitchPilot.Tests.SshIntegrationTests.LegacyAlgorithmsRequireExplicitRetry",
+      "SwitchPilot.Tests.SshIntegrationTests.RealSshTransportReadsAndConfiguresEmulatedIos",
+      "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
+      "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
+      "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
       "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected",
-      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable"
+      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
+      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
+      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
+      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable",
+      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
+      "SwitchPilot.Tests.Windows102Tests.SkippedUpdateVersionSurvivesDpapiRoundtrip",
+      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
     ]
+  },
+  "integration": {
+    "note": "Tests d'intégration SSH à lancer avec l'émulateur local (tests/ssh_emulator.py) ; non exécutés dans ce run."
   },
   "artifact": {
     "path": "artifacts/win-x64/SwitchPilot.exe",
-    "bytes": 68303037,
-    "sha256": "7efd257e10314ecaf09766c5a7ac42144decd8dd31c7ba3823a276f5b319b66d",
+    "bytes": 68329179,
+    "sha256": "857d0af327d08d74995cb43441e76feecea49bf2f49cc9bbffb80c543f873d2d",
     "native_windows_execution": "not run",
     "hardware_validation": "not run"
   }
