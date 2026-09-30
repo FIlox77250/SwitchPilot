@@ -9,7 +9,7 @@ public static class Dialogs
 {
     private static Window Shell(string title, int width = 560) => new()
     {
-        Title = title, Width = width, SizeToContent = SizeToContent.Height, MaxHeight = 850,
+        Title = title, Width = Math.Min(width, ScreenBounds.MaxDialogWidth), SizeToContent = SizeToContent.Height, MaxHeight = ScreenBounds.MaxDialogHeight,
         WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current.MainWindow,
         ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
     };

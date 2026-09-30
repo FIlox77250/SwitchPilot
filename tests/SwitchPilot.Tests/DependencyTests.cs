@@ -14,6 +14,16 @@ public class DependencyTests
         var p = new Platform(); Assert.True((await new DependencyInstaller(p).InstallAsync(new Progress<InstallProgress>(), default)).Available);
         Assert.False(File.Exists(p.Path)); Assert.Equal(1, p.Launched);
     }
+    [Fact] public void EveryAbnormalStateStillOffersRepair()
+    {
+        foreach (var state in new[] { DependencyState.Missing, DependencyState.Incompatible, DependencyState.Incomplete, DependencyState.Stopped, DependencyState.Restricted, DependencyState.Unavailable })
+        {
+            var status = new DependencyStatus(state, "—", "detail");
+            Assert.True(status.OfferInstall);
+            Assert.False(status.Available);
+        }
+        Assert.False(new DependencyStatus(DependencyState.Ready, "1.89", "ok").OfferInstall);
+    }
     [Theory][InlineData("signature")][InlineData("network")][InlineData("cancel")]
     public async Task FailureNeverExecutesAndAlwaysCleansUp(string failure)
     {

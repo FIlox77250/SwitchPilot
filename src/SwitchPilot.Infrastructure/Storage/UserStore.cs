@@ -10,6 +10,8 @@ public sealed record UserSettings(List<ConnectionProfile> Profiles, Dictionary<s
 {
     public int DetectionIntervalSeconds { get; init; } = 60;
     public bool AutoTdrConsole { get; init; }
+    /// <summary>GitHub release tag the user asked not to be offered again.</summary>
+    public string SkippedUpdateTag { get; init; } = "";
 }
 
 [SupportedOSPlatform("windows")]
@@ -32,7 +34,7 @@ public sealed class UserStore(string? directory = null)
             if (value.Profiles is null || value.HostKeys is null || value.Profiles.Any(p => p is null || p.Username is null || p.Password is null || p.EnablePassword is null))
                 throw new InvalidDataException("Structure des paramètres invalide.");
             foreach (var profile in value.Profiles) { try { profile.Validate(); } catch (ArgumentException e) { throw new InvalidDataException("Profil invalide.", e); } }
-            Settings = new(value.Profiles.Select(p => p.Remember ? p : p with { Password = "", EnablePassword = "" }).ToList(), new(value.HostKeys, StringComparer.OrdinalIgnoreCase)) { DetectionIntervalSeconds = Math.Clamp(value.DetectionIntervalSeconds, 10, 3600), AutoTdrConsole = value.AutoTdrConsole };
+            Settings = new(value.Profiles.Select(p => p.Remember ? p : p with { Password = "", EnablePassword = "" }).ToList(), new(value.HostKeys, StringComparer.OrdinalIgnoreCase)) { DetectionIntervalSeconds = Math.Clamp(value.DetectionIntervalSeconds, 10, 3600), AutoTdrConsole = value.AutoTdrConsole, SkippedUpdateTag = value.SkippedUpdateTag ?? "" };
         }
         catch (Exception e) when (e is CryptographicException or JsonException or InvalidDataException)
         {
@@ -58,6 +60,10 @@ public sealed class UserStore(string? directory = null)
     {
         if (interval is < 10 or > 3600) throw new ArgumentException("Intervalle attendu : 10 à 3600 secondes.");
         lock (gate) { Settings = Settings with { DetectionIntervalSeconds = interval, AutoTdrConsole = autoTdr }; Save(); }
+    }
+    public void SaveSkippedUpdate(string tag)
+    {
+        lock (gate) { Settings = Settings with { SkippedUpdateTag = tag ?? "" }; Save(); }
     }
     public void Trust(string host, string fingerprint)
     {

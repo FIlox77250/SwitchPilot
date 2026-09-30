@@ -26,9 +26,13 @@ public record PortDetection(string SwitchName, MacEntry Entry, PortInfo Port, bo
 public record SwitchSnapshot(SwitchIdentity Identity, IReadOnlyList<PortInfo> Ports, IReadOnlyList<VlanInfo> Vlans);
 public record DetectionObservation(SwitchSnapshot Snapshot, IReadOnlyList<MacEntry> Entries);
 public enum ConnectionKind { Ssh, Serial }
+// The switch family drives the CLI dialect and the read-only command set. Cisco IOS and
+// Allied Telesis AlliedWare Plus share enough of the switching syntax to reuse one core.
+public enum SwitchVendor { Cisco, AlliedTelesis }
 public record ConnectionProfile(string Host = "", int Port = 22, string Username = "", bool Remember = false, string Password = "", string EnablePassword = "")
 {
     public ConnectionKind Kind { get; init; }
+    public SwitchVendor Vendor { get; init; } = SwitchVendor.Cisco;
     public string SerialPort { get; init; } = "";
     public int BaudRate { get; init; } = 9600;
     public bool AutoBaud { get; init; }
@@ -37,6 +41,7 @@ public record ConnectionProfile(string Host = "", int Port = 22, string Username
     {
         if (Username is null || Password is null || EnablePassword is null || Username.Any(char.IsControl) || Password.Any(char.IsControl) || EnablePassword.Any(char.IsControl))
             throw new ArgumentException("Identifiants invalides : caractère de contrôle.");
+        if (!Enum.IsDefined(Vendor)) throw new ArgumentException("Constructeur de switch inconnu.");
         if (Kind == ConnectionKind.Ssh && (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username) || Port is < 1 or > 65535))
             throw new ArgumentException("Adresse, utilisateur et port SSH valide requis.");
         if (Kind == ConnectionKind.Serial && (!System.Text.RegularExpressions.Regex.IsMatch(SerialPort ?? "", @"^COM[1-9][0-9]{0,3}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) || !SerialBaudRates.Contains(BaudRate)))
@@ -58,6 +63,7 @@ public interface ICliSession : IAsyncDisposable
 public interface ISwitchDriver : IAsyncDisposable
 {
     ConnectionKind Kind => ConnectionKind.Ssh;
+    SwitchVendor Vendor => SwitchVendor.Cisco;
     bool IsConnected { get; }
     bool IsDemo { get; }
     Task<SwitchSnapshot> ReadSnapshotAsync(CancellationToken ct = default);

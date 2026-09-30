@@ -3,6 +3,6 @@ using SwitchPilot.App.ViewModels;
 namespace SwitchPilot.App.Views;
 public partial class InventoryWindow : Window
 {
-    public InventoryWindow(MainViewModel model) { InitializeComponent(); DataContext = model; Owner = Application.Current.MainWindow; }
+    public InventoryWindow(MainViewModel model) { InitializeComponent(); DataContext = model; Owner = Application.Current.MainWindow; Services.ScreenBounds.CapDialog(this); }
     private void CloseWindow(object sender, RoutedEventArgs e) => Close();
 }

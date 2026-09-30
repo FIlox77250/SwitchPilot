@@ -37,7 +37,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly DetectionSchedule detectionSchedule = new();
     private bool busy, dryRun = true;
     private string status = "Prêt. Connectez un switch ou explorez la démonstration.", connection = "Aucun switch connecté", search = "";
-    private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH · Cisco IOS", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
+    private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH · Cisco IOS ou Allied Telesis", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
     private LocalAdapter? adapter;
     private PortInfo? selectedPort;
     private VlanInfo? selectedVlan;
@@ -86,7 +86,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public VlanInfo? SelectedVlan { get => selectedVlan; set { if (Set(ref selectedVlan, value) && value != null) { VlanId = value.Id.ToString(); VlanName = value.Name; } } }
     public string PortCount => $"{Ports.Count(p => p.IsUp)} actifs / {Ports.Count} ports";
     public DependenciesViewModel Dependencies { get; } = new();
+    public UpdateViewModel Updates { get; } = new();
     public ICommand DependenciesCommand { get; }
+    public ICommand UpdatesCommand { get; }
     public ICommand ConnectCommand { get; }
     public ICommand DemoCommand { get; }
     public ICommand DisconnectCommand { get; }
@@ -121,6 +123,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             var existing = Application.Current.Windows.OfType<DependenciesWindow>().FirstOrDefault();
             if (existing != null) existing.Activate(); else new DependenciesWindow(Dependencies).Show();
         });
+        UpdatesCommand = new RelayCommand(() =>
+        {
+            var existing = Application.Current.Windows.OfType<UpdateWindow>().FirstOrDefault();
+            if (existing != null) existing.Activate(); else new UpdateWindow(Updates).Show();
+        });
+        Updates.SkipRequested += tag => { try { store.SaveSkippedUpdate(tag); } catch { /* A refusal that cannot be saved is not fatal. */ } };
+        Updates.RestartRequested += () => Application.Current.Shutdown(0);
         ConnectCommand = new RelayCommand(Connect, () => !IsBusy);
         DemoCommand = new RelayCommand(() => Run("Démonstration", StartDemo), () => !IsBusy);
         DisconnectCommand = new RelayCommand(() => Run("Déconnexion", async _ => await Disconnect()), () => !IsBusy && driver != null);
@@ -166,6 +175,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         monitor.Start();
         await Dependencies.CheckAsync();
         if (Dependencies.Status.OfferInstall) DependenciesCommand.Execute(null);
+        await Updates.CheckAsync(manual: false);
+        if (Updates.Available && Updates.Release is { } candidate && !string.Equals(candidate.Tag, store.Settings.SkippedUpdateTag, StringComparison.OrdinalIgnoreCase))
+            UpdatesCommand.Execute(null);
     }
     private bool CanRead() => !IsBusy && Connected;
     private bool CanEditPort() => CanRead() && SelectedPort != null;
@@ -231,7 +243,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 legacy = true;
                 session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, true, ct), ct);
             }
-            driver = new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
+            driver = selected.Vendor == SwitchVendor.AlliedTelesis
+                ? new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath))
+                : new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
             profile = selected with { Password = "", EnablePassword = "" };
             store.SaveProfile(selected);
             selected = selected with { Password = "", EnablePassword = "" };
@@ -262,7 +276,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         switchMeasurement = previousSwitchMeasurement = null; measuredSwitch = ""; measuredAdapter = ""; measuredGeneration = -1;
         driver = null; profile = null; snapshot = null; Ports.Clear(); Vlans.Clear(); TdrPairs.Clear(); SelectedPort = null; SelectedVlan = null;
         monitor.EnableCapture(Dependencies.Available);
-        Connection = "Aucun switch connecté"; Model = "SSH · Cisco IOS"; ClearDetection(); RefreshAdapters();
+        Connection = "Aucun switch connecté"; Model = "SSH · Cisco IOS ou Allied Telesis"; ClearDetection(); RefreshAdapters();
         Raise(nameof(IsDemo)); Raise(nameof(Connected)); Raise(nameof(PortCount)); Status = "Déconnecté.";
     }
     private async Task Refresh(CancellationToken ct)

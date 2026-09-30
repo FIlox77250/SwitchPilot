@@ -9,6 +9,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent(); model = new(); DataContext = model;
+        Services.ScreenBounds.Fit(this, 1320, 900);
+        DpiChanged += (_, _) => { var area = Services.ScreenBounds.WorkArea; if (Width > area.Width) Width = area.Width; if (Height > area.Height) Height = area.Height; };
         Closed += async (_, _) => await model.DisposeAsync();
         Loaded += async (_, _) =>
         {

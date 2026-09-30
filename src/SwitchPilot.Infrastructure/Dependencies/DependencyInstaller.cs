@@ -4,7 +4,9 @@ public enum DependencyState { Missing, Ready, Incompatible, Incomplete, Stopped,
 public record DependencyStatus(DependencyState State, string Version, string Detail)
 {
     public bool Available => State == DependencyState.Ready;
-    public bool OfferInstall => State is DependencyState.Missing or DependencyState.Incompatible or DependencyState.Incomplete;
+    // Any state other than Ready can be improved by re-running the official installer,
+    // including a restricted/stopped/incomplete driver. A refusal is never persisted.
+    public bool OfferInstall => State != DependencyState.Ready;
     public string Label => $"Npcap · {Version} · {Detail}";
 }
 public record InstallProgress(string Message, double? Percent = null);
@@ -30,8 +32,10 @@ public sealed class DependencyInstaller(IDependencyPlatform platform)
             await platform.DownloadAsync(path, progress, ct);
             ct.ThrowIfCancellationRequested();
             progress.Report(new("Vérification de la signature de l’éditeur…"));
-            // Hold the file against modification/deletion from signature verification until exit.
-            using var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            // Hold the file against modification from signature verification until exit.
+            // FILE_SHARE_DELETE keeps the file launchable by the elevated installer while
+            // still denying any write, so the verified bytes cannot change under our feet.
+            using var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
             if (!platform.VerifyInstaller(path)) throw new InvalidOperationException("Signature Npcap absente, invalide, non vérifiable ou éditeur inattendu. Installation refusée.");
             ct.ThrowIfCancellationRequested();
             progress.Report(new("Terminez l’installateur Npcap. Laissez la compatibilité WinPcap cochée et l’accès réservé aux administrateurs décoché."));
@@ -51,8 +55,10 @@ public sealed class DependencyInstaller(IDependencyPlatform platform)
         }
         finally
         {
-            if (File.Exists(path)) File.Delete(path);
-            Directory.Delete(directory);
+            // Cleanup must never mask the install result: a locked file or a lingering
+            // helper process must not turn a successful install into an exception.
+            try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { }
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
 }

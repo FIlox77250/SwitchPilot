@@ -9,6 +9,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(UserStore store, MainViewModel model)
     {
         InitializeComponent(); this.store = store; DataContext = model; Owner = Application.Current.MainWindow;
+        Services.ScreenBounds.CapDialog(this);
         Interval.Text = store.Settings.DetectionIntervalSeconds.ToString(); AutoTdr.IsChecked = store.Settings.AutoTdrConsole;
     }
     private void Save(object sender, RoutedEventArgs e)

@@ -5,7 +5,7 @@ namespace SwitchPilot.Core.Cisco;
 
 public static class CiscoParser
 {
-    private static readonly Regex PortPattern = new(@"^(?<port>(?:Fa|Gi|Te|Po|FastEthernet|GigabitEthernet|TenGigabitEthernet|Port-channel)\d+(?:/\d+){0,2})\s+(?<name>.*?)\s*(?<state>connected|notconnect|disabled|err-disabled|inactive|monitoring|sfpAbsent|suspended)\s+(?<vlan>\d+|trunk|routed|unassigned)\s+(?<duplex>a-full|a-half|full|half|auto|unknown)\s+(?<speed>a-\d+|\d+|auto|unknown)\s*(?<type>.*)$", RegexOptions.IgnoreCase);
+    private static readonly Regex PortPattern = new(@"^(?<port>(?:Fa|Gi|Te|Po|FastEthernet|GigabitEthernet|TenGigabitEthernet|Port-channel)\d+(?:/\d+){0,2}|(?:port)?\d+\.\d+(?:\.\d+){0,2})\s+(?<name>.*?)\s*(?<state>connected|notconnect|disabled|err-disabled|inactive|monitoring|sfpAbsent|suspended)\s+(?<vlan>\d+|trunk|routed|unassigned)\s+(?<duplex>a-full|a-half|full|half|auto|unknown)\s+(?<speed>a-\d+|\d+|auto|unknown)\s*(?<type>.*)$", RegexOptions.IgnoreCase);
     public static string Clean(string input)
     {
         var text = Regex.Replace(input, @"\x1B\[[0-?]*[ -/]*[@-~]", "");
@@ -19,6 +19,8 @@ public static class CiscoParser
     }
     public static string NormalizeInterface(string name)
     {
+        var allied = Regex.Match(name.Trim(), @"^(?:port)?(\d+(?:\.\d+){1,3})$", RegexOptions.IgnoreCase);
+        if (allied.Success) return "port" + allied.Groups[1].Value;
         var match = Regex.Match(name.Trim(), @"^(FastEthernet|GigabitEthernet|TenGigabitEthernet|Port-channel|Fa|Gi|Te|Po)(\d+(?:/\d+){0,2})$", RegexOptions.IgnoreCase);
         if (!match.Success) return name.Trim();
         var prefix = match.Groups[1].Value.ToLowerInvariant();
@@ -86,7 +88,7 @@ public static class CiscoParser
             string mac;
             try { mac = NormalizeMac(m.Groups[2].Value); } catch (ArgumentException) { continue; }
             foreach (var port in m.Groups[4].Value.Split([',', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries))
-                if (Regex.IsMatch(port, @"^(Fa|Gi|Te|Po)\w*[-]?\d", RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(port, @"^(?:(?:Fa|Gi|Te|Po)\w*[-]?\d|(?:port)?\d+\.\d+)", RegexOptions.IgnoreCase))
                     result.Add(new(vlan, mac, m.Groups[3].Value.ToUpperInvariant(), NormalizeInterface(port)));
         }
         if (result.Count == 0 && !Regex.IsMatch(output, @"Mac Address Table|Mac Address-Table|Total Mac Addresses|No entries|Vlan\s+Mac Address", RegexOptions.IgnoreCase))

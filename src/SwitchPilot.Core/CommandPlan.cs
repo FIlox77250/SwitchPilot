@@ -19,7 +19,7 @@ public sealed class CommandPlan
 
     public static string Interface(string value)
     {
-        if (!Regex.IsMatch(value, @"^(?:Fa(?:stEthernet)?|Gi(?:gabitEthernet)?|Te(?:nGigabitEthernet)?|Po(?:rt-channel)?)\d+(?:/\d+){0,2}$", RegexOptions.IgnoreCase))
+        if (!Regex.IsMatch(value, @"^(?:(?:Fa(?:stEthernet)?|Gi(?:gabitEthernet)?|Te(?:nGigabitEthernet)?|Po(?:rt-channel)?)\d+(?:/\d+){0,2}|(?:port)?\d+(?:\.\d+){1,3})$", RegexOptions.IgnoreCase))
             throw new ArgumentException("Interface invalide.");
         return Cisco.CiscoParser.NormalizeInterface(value);
     }

@@ -39,4 +39,16 @@ public class Windows102Tests
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }
+    [WindowsFact] public void SkippedUpdateVersionSurvivesDpapiRoundtrip()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "switchpilot-102-" + Guid.NewGuid());
+        try
+        {
+            var store = new UserStore(directory);
+            store.SaveSkippedUpdate("v1.0.3");
+            var restored = new UserStore(directory); restored.Load();
+            Assert.Equal("v1.0.3", restored.Settings.SkippedUpdateTag);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
 }
