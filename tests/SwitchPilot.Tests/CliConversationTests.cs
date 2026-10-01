@@ -175,6 +175,22 @@ public class CliConversationTests
         channel.OnSend = _ => ["%LINK-3-UPDOWN: Interface Fa0/2 changed state\nOK\nSW#"];
         Assert.Contains("OK", await cli.CommandAsync("show test", default));
     }
+    [Fact] public async Task CiscoSbMorePagerIsAdvanced()
+    {
+        // AT-S95 / Cisco-SB pagers print "More: <space>,  Quit: q…" — the app must key the pager.
+        var channel = new FakeTerminal("Console#") { OnSend = _ => ["Console#"] };
+        var cli = new CliConversation(channel); await cli.InitializeAsync(default);
+        channel.OnSend = command => command == " " ? ["\r\nmore\r\nConsole#"]
+            : ["show long\r\npage1\r\nMore: <space>,  Quit: q or CTRL+Z, One line: <enter>"];
+        var output = await cli.CommandAsync("show long", default);
+        Assert.Contains("page1", output); Assert.Contains("more", output); Assert.Contains(" ", channel.Sent);
+    }
+    [Fact] public async Task TerminalDatadumpIsAttemptedAtPrepare()
+    {
+        var channel = new FakeTerminal("Console#") { OnSend = _ => ["Console#"] };
+        await new CliConversation(channel).InitializeAsync(default);
+        Assert.Contains(channel.Sent, s => s.StartsWith("terminal datadump"));
+    }
     private sealed class FakeTerminal(params string[] initial) : ITerminalChannel
     {
         private readonly Queue<string> queue = new(initial);

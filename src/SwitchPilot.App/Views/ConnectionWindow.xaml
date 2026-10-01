@@ -8,6 +8,7 @@
       <ComboBoxItem Content="Détection automatique (recommandé)"/>
       <ComboBoxItem Content="Cisco IOS"/>
       <ComboBoxItem Content="Allied Telesis · AlliedWare Plus"/>
+      <ComboBoxItem Content="Allied Telesis · ancienne série (AT-8000GS · logiciel AT-S95)"/>
     </ComboBox>
     <TextBlock Text="Profils enregistrés" Style="{StaticResource Label}"/>
     <ComboBox x:Name="Profiles" DisplayMemberPath="Label" SelectionChanged="ProfileChanged"/>

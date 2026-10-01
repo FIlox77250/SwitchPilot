@@ -1,6 +1,17 @@
-# Validation de Switch Pilot 1.0.8
+# Validation de Switch Pilot 1.0.9
 
 État au 1er octobre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
+
+## Correctifs 1.0.9 : vérifications locales
+
+- Nouvelle famille AT-S95 (AT-8000GS) : parseurs dédiés `show interfaces status`, `show vlan`, `show interfaces switchport`, `show bridge address-table`, `show version` / `show system`, avec normalisation des ports `g1`, `1/g1` et `ch1`.
+- Détection automatique à trois familles (`Cisco`, `AlliedWare Plus`, `AT-S95`) vérifiée sur les bannières réelles (`SW version …` et table Unit/SW/Boot/HW) ; une famille AT-S95 n'est plus confondue avec AlliedWare Plus.
+- Pager Cisco-Small-Business (`More: <space>,  Quit: q…`) couvert par un test de dialogue qui vérifie l'avance de page puis la synchronisation de la commande suivante ; le pager IOS `--More--` reste couvert par les tests existants.
+- La préparation de session envoie `terminal datadump` ; son refus sur les autres familles est sans effet.
+- Suite locale (Linux, émulateur SSH arrêté) : **202 tests réussis, 18 ignorés, 0 échec, 220 au total**. Les tests ignorés exigent Windows (DPAPI, Authenticode) ou l'émulateur local.
+- Compilation Release complète et exécutable autonome 1.0.9 produits dans `artifacts/win-x64`.
+
+La console RS-232 d'un AT-8000GS physique, sa vitesse réelle (115 200 bauds par défaut, réglable) et la validation des écritures sur cette famille restent à confirmer par l'utilisateur.
 
 ## Correctifs 1.0.8 : vérifications locales
 
@@ -17,7 +28,7 @@ Ces essais n'utilisent ni switch physique, ni adaptateur USB/COM Windows. La val
 
 ## Historique des vérifications 1.0.7
 
-Les résultats ci-dessous concernent la version précédente et ne constituent pas des validations supplémentaires de la 1.0.8.
+Les résultats ci-dessous concernent la version précédente et ne constituent pas des validations supplémentaires de la 1.0.9.
 
 ## Vérifications exécutées
 
@@ -67,7 +78,7 @@ Le message Paramiko « no acceptable ciphers » dans la sortie de l’intégrati
 
 ## Windows : vérifications encore nécessaires
 
-**Aucun lancement de la 1.0.7 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.7 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.7.
+**Aucun lancement de la 1.0.9 sur Windows natif n’a été effectué dans cet environnement de développement.** Le smoke test 1.0.9 est écrit et compilé, mais n’a pas été exécuté localement. Les résultats Windows produits après publication sont consultables dans [GitHub Actions](https://github.com/FIlox77250/SwitchPilot/actions/workflows/windows.yml) pour le commit concerné ; ils complètent ce rapport local. Les anciennes captures sous `screenshots/` concernent la 1.0.1 sous Wine ; elles ne valident ni l’interface ni le bundle de la 1.0.9.
 
 La CI `.github/workflows/windows.yml` lance les tests puis le smoke test de l’EXE publié. Le script `build/smoke-standard-user.ps1` utilise le compte courant s’il est standard, sinon crée un compte standard temporaire et lance directement le processus avec ce compte et son profil chargé pour le runner. Ce parcours CI doit encore être vérifié sur le runner Windows. Le garde interdisant l’exécution élevée de l’application reste actif pendant ces essais.
 
@@ -97,4 +108,4 @@ Aucun switch ni câble console physique n’était disponible. Les fixtures sont
 
 Un seul switch actif à la fois ; aucune exploration récursive. Les annonces ne prouvent pas le port final. Les particularités de teaming/bridging nécessitent une recette dédiée. Un TDR interrompu côté client peut continuer côté switch ; les commandes IOS déjà acceptées ne sont pas annulées automatiquement. Les sauvegardes DPAPI dépendent du compte Windows.
 
-L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.7 sur matériel.
+L’EXE est non signé. ARM64 n’a pas été produit ou testé. Les [mesures de performance](PERFORMANCE.md) sont historiques (1.0.1), sans mesure du démarrage, de la consommation WMI/Npcap ou du débit CLI de la 1.0.9 sur matériel.

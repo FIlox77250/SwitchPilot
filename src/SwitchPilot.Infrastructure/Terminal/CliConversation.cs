@@ -41,6 +41,7 @@ public sealed class CliConversation(ITerminalChannel channel)
     /// <summary>Lock the hostname after PrepareAsync, once a real command round-trip confirmed the prompt.</summary>
     private bool hostnameLocked;
     private void LockHostname() { if (!hostnameLocked) hostnameLocked = true; }
+    private static void TraceSend(string text) => CliTrace.Line(">", text, mask: false);
 
     public async Task InitializeAsync(CancellationToken ct)
     {
@@ -50,7 +51,10 @@ public sealed class CliConversation(ITerminalChannel channel)
     private async Task PrepareAsync(CancellationToken ct)
     {
         if (Prompt.Contains('(')) await CommandAsync("end", ct);
-        try { await CommandAsync("terminal length 0", ct); } catch (CliException) { /* --More-- remains supported. */ }
+        try { await CommandAsync("terminal length 0", ct); } catch (CliException) { /* Pagers remain supported. */ }
+        // AT-S95 / Cisco-Small-Business CLIs disable paging with `terminal datadump`; unknown
+        // elsewhere and safely refused. Without it every long output deadlocks on the pager.
+        try { await CommandAsync("terminal datadump", ct); } catch (CliException) { }
         try { await CommandAsync("terminal width 240", ct); } catch (CliException) { }
         LockHostname();
     }
@@ -61,6 +65,7 @@ public sealed class CliConversation(ITerminalChannel channel)
         // A serial console may need a carrier return to print its banner/login prompt.
         // Exactly one Enter here: a second unconditional one could submit an empty login
         // on a fast device (see the in-loop nudge in ReceiveAsync for silent devices).
+        TraceSend("<Entrée>");
         channel.Send("\n");
         await ReceiveAsync(false, ct, profile);
         await PrepareAsync(ct);
@@ -71,17 +76,20 @@ public sealed class CliConversation(ITerminalChannel channel)
         ct.ThrowIfCancellationRequested();
         if (enablePassword.Any(char.IsControl)) throw new ArgumentException("Mot de passe enable invalide : caractère de contrôle.");
         if (Privileged) return;
+        TraceSend("enable");
         channel.Send("enable\n");
         var response = await ReceiveAsync(true, ct);
         if (PasswordPrompt.IsMatch(response))
         {
             if (string.IsNullOrEmpty(enablePassword))
             {
+                TraceSend("<Ctrl-C>");
                 channel.Send("\x03");
                 await ReceiveAsync(false, ct);
                 throw new CliException("Le switch demande un mot de passe enable. Renseignez-le dans la connexion.");
             }
             ct.ThrowIfCancellationRequested();
+            TraceSend("******");
             channel.Send(enablePassword + "\n");
             response = await ReceiveAsync(false, ct);
         }
@@ -153,7 +161,11 @@ public sealed class CliConversation(ITerminalChannel channel)
                 }
                 if (answer is not null)
                 {
-                    ct.ThrowIfCancellationRequested(); channel.Send(answer);
+                    ct.ThrowIfCancellationRequested();
+                    TraceSend(answer == console.Password + "\n" ? "******"
+                        : answer == "\n" ? "<Entrée>"
+                        : answer.TrimEnd('\n'));
+                    channel.Send(answer);
                     buffer = new TerminalBuffer(); tail = ""; continue;
                 }
             }
@@ -164,6 +176,7 @@ public sealed class CliConversation(ITerminalChannel channel)
             if ((wakeSilentTerminal || console is not null) && !nudged && tail.Length == 0 && channel.IsOpen && timer.Elapsed > TimeSpan.FromMilliseconds(1500))
             {
                 ct.ThrowIfCancellationRequested();
+                TraceSend("<Entrée, relance>");
                 channel.Send("\n");
                 nudged = true;
             }

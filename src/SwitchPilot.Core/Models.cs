@@ -28,7 +28,8 @@ public record DetectionObservation(SwitchSnapshot Snapshot, IReadOnlyList<MacEnt
 public enum ConnectionKind { Ssh, Serial }
 // The switch family drives the CLI dialect and the read-only command set. Cisco IOS and
 // Allied Telesis AlliedWare Plus share enough of the switching syntax to reuse one core.
-public enum SwitchVendor { Cisco, AlliedTelesis }
+// AlliedS95 is the older AT-S95 firmware (AT-8000GS…), a Cisco-Small-Business-style CLI.
+public enum SwitchVendor { Cisco, AlliedTelesis, AlliedS95 }
 public record ConnectionProfile(string Host = "", int Port = 22, string Username = "", bool Remember = false, string Password = "", string EnablePassword = "")
 {
     public ConnectionKind Kind { get; init; }

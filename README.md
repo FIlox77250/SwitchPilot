@@ -1,10 +1,10 @@
-# Switch Pilot 1.0.8
+# Switch Pilot 1.0.9
 
-Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
+Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus et anciennes séries AT-S95 / AT-8000GS), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.8/SwitchPilot.exe) · [Release v1.0.8 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.8)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.9/SwitchPilot.exe) · [Release v1.0.9 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.9)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
@@ -27,7 +27,7 @@ Le mode **Technicien** affiche le lien, le switch, le port, le VLAN et le verdic
 | Technicien | Résultat copiable, notifications Windows discrètes, inventaire local des prises et import/export CSV. |
 | Sauvegardes | Copie chiffrée automatique de la running-config avant chaque modification réelle, export chiffré, lecture et comparaison en mémoire, `write memory` séparé. |
 | Mises à jour | Vérification des releases GitHub au démarrage, proposition de la nouvelle version, téléchargement de l’exécutable portable, vérification de l’empreinte SHA-256, remplacement puis redémarrage. Vérification manuelle dans Paramètres ; une version peut être ignorée. |
-| Constructeurs | Dialogue de connexion avec choix Cisco IOS ou Allied Telesis (AlliedWare Plus). Les ports `port1.0.1` sont reconnus, les VLANs et modes access/trunk sont lus depuis `show vlan brief`. |
+| Constructeurs | Dialogue de connexion avec choix Cisco IOS, Allied Telesis AlliedWare Plus ou Allied Telesis ancienne série (AT-S95 / AT-8000GS). Les ports `port1.0.1` et `g1` sont reconnus ; les VLANs et modes access/trunk sont lus depuis `show vlan brief` (AW+) ou `show vlan` / `show interfaces status` (AT-S95). |
 
 Npcap n’est pas inclus dans l’exécutable. L’utilisateur termine son installateur lui-même ; aucune option silencieuse `/S` n’est utilisée. Les options demandées sont `/winpcap_mode=yes /admin_only=no /no_kill=yes`. Une installation réservée aux administrateurs laisse la capture désactivée dans Switch Pilot. Les pilotes console FTDI, Prolific, Silicon Labs et Cisco sont signalés avec des indications d’installation ; aucun pilote Cisco n’est téléchargé automatiquement. Voir [le guide et la licence Npcap](https://npcap.com/guide/npcap-users-guide.html).
 

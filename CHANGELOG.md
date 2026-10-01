@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.9 — 1er octobre 2026
+
+Correctifs pour les anciennes séries Allied Telesis (AT-8000GS, logiciel AT-S95) : la console COM restait bloquée quel que soit le débit, alors que PuTTY fonctionnait.
+
+- **Pager Cisco-Small-Business** : la ligne `More: <space>,  Quit: q or CTRL+Z…` est désormais reconnue en plus du `--More--` IOS, avec les variantes `Press any key` et `(q)uit`. Toute sortie longue (par exemple `show interfaces status` sur 24 ports) figeait la session jusqu'au timeout faute de touche d'avance.
+- **`terminal datadump`** : la préparation de session tente aussi la commande qui coupe la pagination sur cette famille ; refusée silencieusement ailleurs.
+- **Famille AT-S95 dédiée** (`Allied Telesis · ancienne série (AT-8000GS)`) : détection automatique depuis `show version` (bannière `SW version …` ou table Unit/SW/Boot/HW) avant la famille AlliedWare Plus.
+  - Ports `g1`…`g48` et piles `1/g1`, canaux `ch1` ; requêtes `show interfaces status`, `show vlan`, `show interfaces switchport` (mode général classé access selon l'appartenance), `show bridge address-table`, `show version` / `show system`.
+  - La console RS-232 de référence est à **115 200 bauds** (2400–115 200 selon réglage) ; l'auto-détection de vitesse reste disponible.
+  - Lecture, détection du port et export de la configuration pris en charge ; les écritures sont refusées avec un message explicite tant que le dialecte de configuration (`configure`, `interface ethernet`, `copy running-config startup-config`) n'a pas été validé sur matériel.
+- **Journal CLI** : les commandes envoyées sont tracées (mots de passe en `******`, réponses sensibles masquées) en complément des réponses reçues.
+
 ## 1.0.8 — 1er octobre 2026
 
 - **Console lente** : la réception d'une commande distingue désormais l'inactivité de la durée totale. Une sortie qui continue d'arriver à 9600 bauds n'est plus interrompue après 25 secondes ; l'attente reste bornée à cinq minutes et annulable.

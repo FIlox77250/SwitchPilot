@@ -1,19 +1,30 @@
 {
-  "version": "1.0.8",
+  "version": "1.0.9",
   "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
-  "integration": {
-    "total": 210,
-    "executed": 203,
-    "passed": 203,
+  "regression": {
+    "total": 220,
+    "executed": 202,
+    "passed": 202,
     "failed": 0,
-    "skipped": 7,
+    "skipped": 18,
     "timing": {
-      "creation": "2026-10-01T14:40:30.6046248+02:00",
-      "queuing": "2026-10-01T14:40:30.6046248+02:00",
-      "start": "2026-10-01T14:40:30.1320269+02:00",
-      "finish": "2026-10-01T14:40:58.2672053+02:00"
+      "creation": "2026-10-01T21:51:58.2408800+02:00",
+      "queuing": "2026-10-01T21:51:58.2408800+02:00",
+      "start": "2026-10-01T21:51:57.7171851+02:00",
+      "finish": "2026-10-01T21:52:13.4538015+02:00"
     },
     "skipped_tests": [
+      "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
+      "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelHandlesFragmentedOutputAndSyslog",
+      "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelReadsSlowSwitchportDumpWithoutLosingSynchronization",
+      "SwitchPilot.Tests.SshIntegrationTests.CancellationClosesSessionAndDisposeIsIdempotent",
+      "SwitchPilot.Tests.SshIntegrationTests.ConcurrentCommandsDoNotMixResponses",
+      "SwitchPilot.Tests.SshIntegrationTests.LegacyAlgorithmsRequireExplicitRetry",
+      "SwitchPilot.Tests.SshIntegrationTests.RealSshTransportReadsAndConfiguresEmulatedIos",
+      "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
+      "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
+      "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
+      "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected",
       "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
       "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
       "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
@@ -21,56 +32,6 @@
       "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
       "SwitchPilot.Tests.Windows102Tests.SkippedUpdateVersionSurvivesDpapiRoundtrip",
       "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
-    ]
-  },
-  "previous_1_0_7": {
-    "version": "1.0.7",
-    "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
-    "regression": {
-      "total": 203,
-      "executed": 186,
-      "passed": 186,
-      "failed": 0,
-      "skipped": 17,
-      "timing": {
-        "creation": "2026-09-30T18:25:49.1004633+02:00",
-        "queuing": "2026-09-30T18:25:49.1004633+02:00",
-        "start": "2026-09-30T18:25:48.5881863+02:00",
-        "finish": "2026-09-30T18:25:54.6840434+02:00"
-      },
-      "skipped_tests": [
-        "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
-        "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelHandlesFragmentedOutputAndSyslog",
-        "SwitchPilot.Tests.SshIntegrationTests.CancellationClosesSessionAndDisposeIsIdempotent",
-        "SwitchPilot.Tests.SshIntegrationTests.ConcurrentCommandsDoNotMixResponses",
-        "SwitchPilot.Tests.SshIntegrationTests.LegacyAlgorithmsRequireExplicitRetry",
-        "SwitchPilot.Tests.SshIntegrationTests.RealSshTransportReadsAndConfiguresEmulatedIos",
-        "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
-        "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
-        "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
-        "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected",
-        "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
-        "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
-        "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
-        "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable",
-        "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
-        "SwitchPilot.Tests.Windows102Tests.SkippedUpdateVersionSurvivesDpapiRoundtrip",
-        "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
-      ]
-    }
-  },
-  "wpf_probe": {
-    "environment": "Wine, application windows and resources, separate test host",
-    "result": "passed",
-    "scenarios": [
-      "dependencies opened from modal settings",
-      "update window read-only progress binding",
-      "cached release refreshed on manual opening"
-    ],
-    "limitations": [
-      "Application startup guard not exercised by test host",
-      "No real update or Npcap installation",
-      "No native Windows or physical COM validation"
     ]
   }
 }

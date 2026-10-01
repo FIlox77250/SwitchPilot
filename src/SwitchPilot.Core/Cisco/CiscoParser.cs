@@ -21,6 +21,13 @@ public static class CiscoParser
     {
         var allied = Regex.Match(name.Trim(), @"^(?:port)?(\d+(?:\.\d+){1,3})$", RegexOptions.IgnoreCase);
         if (allied.Success) return "port" + allied.Groups[1].Value;
+        var s95 = Regex.Match(name.Trim(), @"^(?:ethernet\s+)?(?:(\d+)/)?(g\d+|ch\d+)$", RegexOptions.IgnoreCase);
+        if (s95.Success)
+        {
+            var unit = s95.Groups[1].Value;
+            var port = s95.Groups[2].Value.ToLowerInvariant();
+            return unit.Length == 0 || unit == "1" ? port : unit + "/" + port;
+        }
         var match = Regex.Match(name.Trim(), @"^(FastEthernet|GigabitEthernet|TenGigabitEthernet|Port-channel|Fa|Gi|Te|Po)(\d+(?:/\d+){0,2})$", RegexOptions.IgnoreCase);
         if (!match.Success) return name.Trim();
         var prefix = match.Groups[1].Value.ToLowerInvariant();

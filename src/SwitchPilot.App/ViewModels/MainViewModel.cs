@@ -261,7 +261,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             // rather than defaulting to Cisco, so a wrong family cannot fail on both transports.
             var order = !selected.AutoDetectVendor ? new[] { selected.Vendor }
                 : detected is { } only ? new[] { only }
-                : new[] { SwitchVendor.Cisco, SwitchVendor.AlliedTelesis };
+                : new[] { SwitchVendor.Cisco, SwitchVendor.AlliedTelesis, SwitchVendor.AlliedS95 };
             profile = selected with { Password = "", EnablePassword = "" };
             store.SaveProfile(selected);
             selected = selected with { Password = "", EnablePassword = "" };
@@ -277,23 +277,32 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 {
                     readError = e;
                     if (!session.IsConnected || order.Length == 1) break;
-                    audit.Write("Détection du constructeur", $"Lecture impossible avec {(candidate == SwitchVendor.AlliedTelesis ? "Allied Telesis" : "Cisco IOS")} : {e.GetType().Name}.");
+                    audit.Write("Détection du constructeur", $"Lecture impossible avec {VendorName(candidate)} : {e.GetType().Name}.");
                 }
             }
-            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité ancien IOS" : "Connecté") + $" · {(vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis" : "Cisco IOS")}.");
+            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité ancien IOS" : "Connecté") + $" · {VendorName(vendor)}.");
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
             if (readError is not null)
             {
                 // Authentication succeeded, but a timed-out read may have closed the session.
-                Model = vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis · AlliedWare Plus" : "Cisco IOS";
+                Model = VendorName(vendor);
                 Connection = session.Hostname + (session.IsConnected ? " · connecté" : " · déconnecté");
                 Status = (session.IsConnected ? "Connecté, mais la lecture de l'état a échoué : " : "Connexion interrompue pendant la lecture de l'état : ") + FriendlyError(readError);
             }
         });
     }
-    private ISwitchDriver CreateDriver(ICliSession session, SwitchVendor vendor) => vendor == SwitchVendor.AlliedTelesis
-        ? new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath))
-        : new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath));
+    private ISwitchDriver CreateDriver(ICliSession session, SwitchVendor vendor) => vendor switch
+    {
+        SwitchVendor.AlliedTelesis => new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath)),
+        SwitchVendor.AlliedS95 => new SwitchPilot.Infrastructure.Allied.AlliedS95Driver(session, audit),
+        _ => new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath)),
+    };
+    private static string VendorName(SwitchVendor vendor) => vendor switch
+    {
+        SwitchVendor.AlliedTelesis => "Allied Telesis · AlliedWare Plus",
+        SwitchVendor.AlliedS95 => "Allied Telesis · AT-S95 (AT-8000GS)",
+        _ => "Cisco IOS",
+    };
     private bool Trust(string host, string fingerprint) => dispatcher.Invoke(() =>
     {
         var known = store.KnownFingerprint(host);
