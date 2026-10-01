@@ -24,6 +24,12 @@ Fermer les autres logiciels qui utilisent le même COM. Vérifier le câble cons
 
 Les noms FTDI/Prolific/Silicon Labs sont identifiés à partir des identifiants USB. Tous les modèles de câbles ne peuvent pas être reconnus. Pour Cisco USB Console, utiliser le téléchargement officiel correspondant au modèle et un compte Cisco ; aucun pilote Cisco n’est téléchargé automatiquement.
 
+À 9600 bauds, la lecture de tous les ports peut prendre plus de 25 secondes. L'application attend tant que des données arrivent, avec une limite totale de cinq minutes par commande et une limite de 25 secondes sans réception. Une annulation ou un délai dépassé ferme la session pour éviter de mélanger deux réponses ; reconnecter le switch avant de reprendre. Si le problème persiste, relever le modèle, la vitesse et la dernière commande du journal `%APPDATA%\SwitchPilot\Logs\console-*.log`, en masquant les informations sensibles avant de le partager.
+
+## Mises à jour
+
+**Paramètres → Vérifier les mises à jour sur GitHub** ouvre la recherche d'une version plus récente. Si une nouvelle version est proposée, **Installer maintenant** télécharge l'exécutable, vérifie son empreinte et redémarre l'application. Si la version installée est à jour, aucune installation n'est nécessaire. Cette opération ne nécessite aucune connexion au switch.
+
 ## Verdict câble et TDR
 
 Un lien à 100 Mb/s peut être normal sur un port Fast Ethernet. Une carte Gigabit à 100 Mb/s invite à contrôler le port distant et les vitesses forcées avant de conclure à un défaut de paire.

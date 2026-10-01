@@ -10,8 +10,10 @@ public sealed class SerialTerminalChannel : ITerminalChannel
         // PuTTY asserts DTR by default; deasserting it prevents some USB-to-serial adapters and
         // switch UARTs from driving TX, producing a silent timeout. RTS stays at the adapter
         // default: several switches use RTS as a power/mute gate and a bare RTS-high can mute RX.
+        // The application uses Windows COM ports. POSIX pseudo-terminals used by the
+        // integration suite have no modem-control lines and reject asserting DTR.
         port = new SerialPort(name, baud, Parity.None, 8, StopBits.One)
-        { Handshake = Handshake.None, DtrEnable = true, RtsEnable = false, ReadTimeout = 250, WriteTimeout = 2000 };
+        { Handshake = Handshake.None, DtrEnable = OperatingSystem.IsWindows(), RtsEnable = false, ReadTimeout = 250, WriteTimeout = 2000 };
         try
         {
             port.Open();

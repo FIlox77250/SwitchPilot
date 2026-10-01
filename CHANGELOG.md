@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.8 — 1er octobre 2026
+
+- **Console lente** : la réception d'une commande distingue désormais l'inactivité de la durée totale. Une sortie qui continue d'arriver à 9600 bauds n'est plus interrompue après 25 secondes ; l'attente reste bornée à cinq minutes et annulable.
+- **Console et SSH** : aucune touche Entrée supplémentaire n'est envoyée pendant une commande lente. La relance d'une console muette est réservée à la connexion initiale.
+- **Dépendances et mises à jour** : correction des liaisons WPF des barres de progression qui provoquaient une `InvalidOperationException` à l'ouverture des fenêtres.
+- **Recherche des mises à jour** : une vérification manuelle rafraîchit la recherche même si une version avait déjà été trouvée.
+- **Messages d'erreur** : une erreur générale de l'application ne demande plus systématiquement de reconnecter le switch ; une session fermée après un échec de lecture n'est plus annoncée comme connectée.
+- **Tests série** : scénario de lecture de 26 secondes sur pseudo-terminal Linux, avec vérification de la commande suivante. DTR reste activé sur Windows ; les pseudo-terminaux Linux ne disposent pas de cette ligne matérielle.
+
 ## 1.0.7 — 30 septembre 2026
 
 Correctifs ciblés sur le cas « session ouverte mais première commande sans réponse » (timeout après connexion réussie, en SSH comme en console).

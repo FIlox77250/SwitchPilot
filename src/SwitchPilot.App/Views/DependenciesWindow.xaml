@@ -5,7 +5,7 @@
     <TextBlock Text="Npcap permet de détecter automatiquement le port du switch sans identifiants." Margin="0,0,0,20"/>
     <TextBlock Text="{Binding Status.Label}" FontWeight="SemiBold" Margin="0,0,0,16"/>
     <TextBlock Text="L’installateur officiel s’ouvrira avec une demande UAC. Laissez « WinPcap API-compatible Mode » coché et « Administrators only » décoché. Vous acceptez la licence dans l’installateur Npcap." Style="{StaticResource MutedText}" Margin="0,0,0,16"/>
-    <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding Indeterminate}" Height="4" Margin="0,0,0,16"/>
+    <ProgressBar Value="{Binding Progress, Mode=OneWay}" IsIndeterminate="{Binding Indeterminate}" Height="4" Margin="0,0,0,16"/>
     <TextBlock Text="{Binding Message}" Margin="0,0,0,16"/>
     <WrapPanel>
       <Button Content="Installer maintenant" Command="{Binding InstallCommand}" Style="{StaticResource PrimaryButton}"/>

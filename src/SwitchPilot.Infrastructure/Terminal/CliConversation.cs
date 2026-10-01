@@ -23,6 +23,7 @@ public sealed class CliConversation(ITerminalChannel channel)
 {
     public string Hostname { get; private set; } = "";
     public string Prompt { get; private set; } = "";
+    /// <summary>Startup deadline, or maximum silence while receiving a command response.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(25);
     /// <summary>When set by the calling session, logs the received chunks of that command (masked).</summary>
     internal string? CurrentCommandLogMask { get; set; }
@@ -43,7 +44,7 @@ public sealed class CliConversation(ITerminalChannel channel)
 
     public async Task InitializeAsync(CancellationToken ct)
     {
-        await ReceiveAsync(false, ct);
+        await ReceiveAsync(false, ct, wakeSilentTerminal: true);
         await PrepareAsync(ct);
     }
     private async Task PrepareAsync(CancellationToken ct)
@@ -91,7 +92,7 @@ public sealed class CliConversation(ITerminalChannel channel)
         ct.ThrowIfCancellationRequested();
         if (command.Any(char.IsControl)) throw new ArgumentException("Une seule commande CLI sans caractère de contrôle est autorisée.");
         channel.Send(command + "\n");
-        var response = await ReceiveAsync(false, ct);
+        var response = await ReceiveAsync(false, ct, commandResponse: true);
         var error = Error.Match(response);
         if (error.Success)
         {
@@ -106,7 +107,8 @@ public sealed class CliConversation(ITerminalChannel channel)
         return string.Join('\n', lines);
     }
     private static string StripSyslog(string text) => CiscoSyslog.Replace(AlliedSyslog.Replace(text, ""), "");
-    private async Task<string> ReceiveAsync(bool allowPassword, CancellationToken ct, ConnectionProfile? console = null)
+    private async Task<string> ReceiveAsync(bool allowPassword, CancellationToken ct, ConnectionProfile? console = null,
+        bool commandResponse = false, bool wakeSilentTerminal = false)
     {
         var timer = Stopwatch.StartNew();
         var buffer = new TerminalBuffer();
@@ -114,7 +116,11 @@ public sealed class CliConversation(ITerminalChannel channel)
         var lastReceive = Stopwatch.StartNew();
         var loginSent = false; var passwordSent = false; var initialAnswered = false; var returnSent = false;
         var nudged = false;
-        while (timer.Elapsed < Timeout)
+        // At 9600 baud a complete switchport report can take more than 25 seconds.
+        // Keep receiving while it makes progress, but retain a total cap against
+        // endless output. Startup/baud probes still have their short fixed deadline.
+        var totalLimit = commandResponse ? TimeSpan.FromMinutes(5) : Timeout;
+        while (timer.Elapsed < totalLimit && (!commandResponse || lastReceive.Elapsed < Timeout))
         {
             ct.ThrowIfCancellationRequested();
             var chunk = channel.ReadAvailable();
@@ -152,11 +158,10 @@ public sealed class CliConversation(ITerminalChannel channel)
                 }
             }
             if (allowPassword && PasswordPrompt.IsMatch(tail)) return buffer.ToString();
-            // A silent device (console needing Enter, SSH banner waiting for a keypress) would
-            // otherwise stall until Timeout. Nudge once, and only while nothing arrived at all:
-            // an empty line at a real prompt is harmless, while a visible partial prompt means
-            // the dialogue already started and must not be disturbed.
-            if (!nudged && tail.Length == 0 && channel.IsOpen && timer.Elapsed > TimeSpan.FromMilliseconds(1500))
+            // Wake only an initial terminal prompt. An Enter while a command is running
+            // can answer an unseen question or queue another prompt and desynchronize
+            // subsequent responses. Never inject it into an established dialogue.
+            if ((wakeSilentTerminal || console is not null) && !nudged && tail.Length == 0 && channel.IsOpen && timer.Elapsed > TimeSpan.FromMilliseconds(1500))
             {
                 ct.ThrowIfCancellationRequested();
                 channel.Send("\n");

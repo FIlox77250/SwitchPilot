@@ -127,10 +127,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             var existing = Application.Current.Windows.OfType<DependenciesWindow>().FirstOrDefault();
             if (existing != null) existing.Activate(); else new DependenciesWindow(Dependencies).Show();
         });
-        UpdatesCommand = new RelayCommand(() =>
+        UpdatesCommand = new RelayCommand(async () =>
         {
             var existing = Application.Current.Windows.OfType<UpdateWindow>().FirstOrDefault();
-            if (existing != null) existing.Activate(); else new UpdateWindow(Updates).Show();
+            if (existing != null) { existing.Activate(); await Updates.CheckAsync(manual: true); }
+            else new UpdateWindow(Updates).Show();
         });
         Updates.SkipRequested += tag => { try { store.SaveSkippedUpdate(tag); } catch { /* A refusal that cannot be saved is not fatal. */ } };
         Updates.RestartRequested += () => Application.Current.Shutdown(0);
@@ -180,8 +181,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         await Dependencies.CheckAsync();
         if (Dependencies.Status.OfferInstall) DependenciesCommand.Execute(null);
         await Updates.CheckAsync(manual: false);
-        if (Updates.Available && Updates.Release is { } candidate && !string.Equals(candidate.Tag, store.Settings.SkippedUpdateTag, StringComparison.OrdinalIgnoreCase))
-            UpdatesCommand.Execute(null);
+        if (Updates.Available && Updates.Release is { } candidate && !string.Equals(candidate.Tag, store.Settings.SkippedUpdateTag, StringComparison.OrdinalIgnoreCase)
+            && !Application.Current.Windows.OfType<UpdateWindow>().Any())
+            new UpdateWindow(Updates, refreshOnLoad: false).Show();
     }
     private bool CanRead() => !IsBusy && Connected;
     private bool CanEditPort() => CanRead() && SelectedPort != null;
@@ -282,11 +284,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
             if (readError is not null)
             {
-                // A read failure must not look like a login failure: keep the session open and
-                // state exactly what could not be read so the user can retry or adjust.
+                // Authentication succeeded, but a timed-out read may have closed the session.
                 Model = vendor == SwitchVendor.AlliedTelesis ? "Allied Telesis · AlliedWare Plus" : "Cisco IOS";
-                Connection = session.Hostname + " · connecté";
-                Status = "Connecté, mais la lecture de l'état a échoué : " + FriendlyError(readError);
+                Connection = session.Hostname + (session.IsConnected ? " · connecté" : " · déconnecté");
+                Status = (session.IsConnected ? "Connecté, mais la lecture de l'état a échoué : " : "Connexion interrompue pendant la lecture de l'état : ") + FriendlyError(readError);
             }
         });
     }

@@ -1,6 +1,23 @@
-# Validation de Switch Pilot 1.0.7
+# Validation de Switch Pilot 1.0.8
 
-État au 30 septembre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
+État au 1er octobre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
+
+## Correctifs 1.0.8 : vérifications locales
+
+- Compilation de toute la solution en Release avec `-warnaserror` : **zéro erreur, zéro avertissement**.
+- Exécutable autonome Windows x64 1.0.8 produit dans `artifacts/win-x64`, avec runtime embarqué.
+- Régression série reproduite avant correction : `show interfaces switchport` sur un pseudo-terminal avec le véritable `System.IO.Ports` échouait à 25 secondes malgré une réponse continue. Après correction, les 26 ports sont lus en 26 secondes et la commande suivante reste synchronisée.
+- Suite complète avec émulateurs SSH et série : **203 réussis, 7 ignorés, 0 échec, 210 au total**. Les sept exclusions exigent Windows (DPAPI et Authenticode).
+- Six tests de dialogue couvrent la sortie lente, la commande suivante, l'inactivité, l'annulation, la relance au démarrage et l'absence de touche Entrée injectée pendant une commande.
+- L'erreur des dépendances a été reproduite dans WPF sous Wine avec les fenêtres de l'application : liaison `TwoWay` impossible sur la propriété `Progress` en lecture seule. Le test utilise un programme hôte séparé ; le garde contre le lancement administrateur de l'application reste inchangé.
+
+- Après correction, le contrôle WPF sous Wine réussit : ouverture des dépendances depuis les paramètres modaux et affichage de la fenêtre de mise à jour avec nouvelle recherche après une version mémorisée. Le test emploie une source de versions fictive ; aucun téléchargement ni installateur réel n’est lancé. Le parcours complet de démarrage de l’exécutable sous Windows natif reste à valider.
+
+Ces essais n'utilisent ni switch physique, ni adaptateur USB/COM Windows. La validation du cas exact signalé nécessite encore le modèle, la vitesse et le journal de la console, puis un essai du nouvel exécutable sur cet équipement.
+
+## Historique des vérifications 1.0.7
+
+Les résultats ci-dessous concernent la version précédente et ne constituent pas des validations supplémentaires de la 1.0.8.
 
 ## Vérifications exécutées
 

@@ -61,6 +61,74 @@ public class CliConversationTests
         var channel = new FakeTerminal(); var cli = new CliConversation(channel) { Timeout = TimeSpan.FromMilliseconds(80) };
         await Assert.ThrowsAsync<TimeoutException>(() => cli.InitializeAsync(default));
     }
+    [Fact] public async Task SlowCommandOutputKeepsTheConversationAliveUntilItsPrompt()
+    {
+        var channel = new FakeTerminal("SW#") { OnSend = _ => ["SW#"] };
+        var cli = new CliConversation(channel);
+        await cli.InitializeAsync(default);
+        cli.Timeout = TimeSpan.FromMilliseconds(300);
+        // Each chunk arrives on a separate receive iteration, like a long switchport
+        // report over a 9600-baud console. Total duration exceeds the idle timeout.
+        channel.OnSend = _ => [.. Enumerable.Repeat("Name: Gi0/1\r\nSwitchport: Enabled\r\n", 30), "SW#"];
+
+        var output = await cli.CommandAsync("show interfaces switchport", default);
+
+        Assert.Equal(30, output.Split("Switchport: Enabled").Length - 1);
+        Assert.DoesNotContain("SW#", output);
+        channel.OnSend = _ => ["next response\nSW#"];
+        Assert.Equal("next response", await cli.CommandAsync("show vlan brief", default));
+    }
+    [Fact] public async Task StalledCommandOutputStillTimesOut()
+    {
+        var channel = new FakeTerminal("SW#") { OnSend = _ => ["SW#"] };
+        var cli = new CliConversation(channel);
+        await cli.InitializeAsync(default);
+        cli.Timeout = TimeSpan.FromMilliseconds(300);
+        channel.OnSend = _ => ["incomplete report\n"];
+
+        await Assert.ThrowsAsync<TimeoutException>(() => cli.CommandAsync("show interfaces switchport", default));
+    }
+    [Fact] public async Task SilentCommandDoesNotSendAnExtraEnter()
+    {
+        var channel = new FakeTerminal("SW#") { OnSend = _ => ["SW#"] };
+        var cli = new CliConversation(channel);
+        await cli.InitializeAsync(default);
+        cli.Timeout = TimeSpan.FromMilliseconds(1800);
+        channel.OnSend = command => command == "\n" ? ["SW#"] : [];
+
+        await Assert.ThrowsAsync<TimeoutException>(() => cli.CommandAsync("show interfaces switchport", default));
+
+        Assert.DoesNotContain("\n", channel.Sent);
+    }
+    [Fact] public async Task SilentStartupCanStillWakeTheTerminal()
+    {
+        var channel = new FakeTerminal { OnSend = _ => ["SW#"] };
+        var cli = new CliConversation(channel) { Timeout = TimeSpan.FromSeconds(3) };
+
+        await cli.InitializeAsync(default);
+
+        Assert.Equal("SW", cli.Hostname);
+        Assert.Contains("\n", channel.Sent);
+    }
+    [Fact] public async Task StartupNoiseDoesNotExtendTheBaudProbeDeadline()
+    {
+        var channel = new FakeTerminal([.. Enumerable.Repeat("unreadable startup bytes", 100)]);
+        var cli = new CliConversation(channel) { Timeout = TimeSpan.FromMilliseconds(300) };
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        await Assert.ThrowsAsync<TimeoutException>(() => cli.InitializeAsync(deadline.Token));
+    }
+    [Fact] public async Task StreamingCommandCanStillBeCancelled()
+    {
+        var channel = new FakeTerminal("SW#") { OnSend = _ => ["SW#"] };
+        var cli = new CliConversation(channel);
+        await cli.InitializeAsync(default);
+        cli.Timeout = TimeSpan.FromMilliseconds(300);
+        channel.OnSend = _ => [.. Enumerable.Repeat("partial output\n", 100)];
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMilliseconds(600));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cli.CommandAsync("show interfaces switchport", deadline.Token));
+    }
     [Fact] public async Task CancellationIsObserved()
     {
         var channel = new FakeTerminal(); var cli = new CliConversation(channel);

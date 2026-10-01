@@ -9,6 +9,7 @@ using SwitchPilot.App.ViewModels;
 using SwitchPilot.App.Views;
 using SwitchPilot.Core;
 using SwitchPilot.Infrastructure.Storage;
+using SwitchPilot.Infrastructure.Updates;
 
 namespace SwitchPilot.App.Services;
 
@@ -45,6 +46,8 @@ internal static class SmokeTest
             if (loaded.Settings.Profiles[0].Kind != ConnectionKind.Serial || loaded.Settings.Profiles[0].SerialPort != "COM123") throw new InvalidOperationException("Serial profile migration failed.");
             var settingsWindow = new SettingsWindow(store, model); settingsWindow.Show(); settingsWindow.UpdateLayout(); settingsWindow.Close();
             var dependenciesWindow = new DependenciesWindow(model.Dependencies); dependenciesWindow.Show(); dependenciesWindow.UpdateLayout(); dependenciesWindow.Close();
+            CheckSettingsDependencyCommand(store, model);
+            await CheckUpdateWindowAsync();
             var inventoryWindow = new InventoryWindow(model); inventoryWindow.Show(); inventoryWindow.UpdateLayout(); inventoryWindow.Close();
             var connection = new ConnectionWindow([new("smoke-switch", 2222, "smoke-user", true, "fake-secret", "fake-enable")]);
             connection.Show(); connection.UpdateLayout();
@@ -96,6 +99,54 @@ internal static class SmokeTest
     {
         for (var i = 0; model.IsBusy && i < 200; i++) await Task.Delay(25);
         if (model.IsBusy) throw new TimeoutException("Demo operation timed out.");
+    }
+    private static void CheckSettingsDependencyCommand(UserStore store, MainViewModel model)
+    {
+        var settings = new SettingsWindow(store, model);
+        Exception? failure = null;
+        settings.Loaded += (_, _) => settings.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                model.DependenciesCommand.Execute(null);
+                var child = Application.Current.Windows.OfType<DependenciesWindow>().Single();
+                child.UpdateLayout();
+                if (!child.IsVisible) throw new InvalidOperationException("Dependencies command did not open a visible window from settings.");
+                child.Close();
+            }
+            catch (Exception e) { failure = e; }
+            finally { settings.Close(); }
+        }));
+        settings.ShowDialog();
+        if (failure is not null) throw new InvalidOperationException("Settings dependency command failed.", failure);
+    }
+    private static async Task CheckUpdateWindowAsync()
+    {
+        var source = new SmokeUpdateSource();
+        var updates = new UpdateViewModel(source);
+        await updates.CheckAsync(manual: false);
+        var window = new UpdateWindow(updates);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            if (updates.Release?.Version is not { Major: 99, Build: >= 2 })
+                throw new InvalidOperationException("Opening the update window did not refresh the cached release.");
+        }
+        finally { window.Close(); }
+    }
+    private sealed class SmokeUpdateSource : IUpdateSource
+    {
+        private int checks;
+        public Task<UpdateCheckResult> CheckAsync(Version current, CancellationToken ct)
+        {
+            var revision = ++checks;
+            return Task.FromResult(UpdateCheckResult.Available(new(new Version(99, 0, revision), $"v99.0.{revision}", "Smoke update", "Smoke release notes",
+                new Uri("https://github.com/example/example/releases/download/test/SwitchPilot.exe"), 1, new string('0', 64),
+                new Uri("https://github.com/example/example/releases/tag/test"))));
+        }
+        public Task DownloadAsync(UpdateRelease release, string path, IProgress<UpdateProgress> progress, CancellationToken ct) =>
+            throw new InvalidOperationException("The update smoke test must never download or install a release.");
     }
     private static async Task Confirm(ICommand command, MainViewModel model, string expectedCommand)
     {

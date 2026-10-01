@@ -10,7 +10,7 @@
           <TextBlock Text="{Binding Notes}" TextWrapping="Wrap"/>
         </ScrollViewer>
       </Border>
-      <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding Indeterminate}" Height="4" Margin="0,0,0,16"/>
+      <ProgressBar Value="{Binding Progress, Mode=OneWay}" IsIndeterminate="{Binding Indeterminate}" Height="4" Margin="0,0,0,16"/>
       <WrapPanel>
         <Button Content="Installer maintenant" Command="{Binding InstallCommand}" Style="{StaticResource PrimaryButton}"/>
         <Button Content="Télécharger depuis GitHub" Command="{Binding OpenPageCommand}"/>

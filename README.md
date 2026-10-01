@@ -1,10 +1,10 @@
-# Switch Pilot 1.0.7
+# Switch Pilot 1.0.8
 
 Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.7/SwitchPilot.exe) · [Release v1.0.7 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.7)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.8/SwitchPilot.exe) · [Release v1.0.8 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.8)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
@@ -111,4 +111,4 @@ L’exécutable livré n’est pas signé. Republier lors des mises à jour de s
 
 Un autre constructeur peut implémenter `ISwitchDriver` ; les transports partagent `ICliSession` et `ITerminalChannel`. La conversation sérialise les échanges, traite les prompts/pagination/syslogs, borne les réponses et ferme une session désynchronisée après délai, annulation ou confirmation inattendue.
 
-Les [mesures de performance historiques 1.0.1](docs/PERFORMANCE.md) restent disponibles ; elles ne sont pas des mesures de la 1.0.7.
+Les [mesures de performance historiques 1.0.1](docs/PERFORMANCE.md) restent disponibles ; elles ne sont pas des mesures de la 1.0.8.

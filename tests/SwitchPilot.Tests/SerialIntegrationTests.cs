@@ -9,6 +9,19 @@ public sealed class SerialIntegrationFactAttribute : FactAttribute
 public class SerialIntegrationTests
 {
     private static string Device => Environment.GetEnvironmentVariable("SWITCHPILOT_SERIAL_TEST_PORT")!;
+    [SerialIntegrationFact] public async Task RealSerialChannelReadsSlowSwitchportDumpWithoutLosingSynchronization()
+    {
+        using var channel = new SerialTerminalChannel(Device, 9600);
+        var cli = new CliConversation(channel);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        await cli.InitializeConsoleAsync(new() { Kind = ConnectionKind.Serial, SerialPort = "COM1" }, deadline.Token);
+        var modes = Core.Cisco.CiscoParser.SwitchportModes(await cli.CommandAsync("show interfaces switchport", deadline.Token));
+        Assert.Equal(26, modes.Count);
+        Assert.Equal("access", modes["Fa0/26"]);
+        var counters = Core.Cisco.CiscoParser.Counters(await cli.CommandAsync("show interfaces Fa0/1", deadline.Token));
+        Assert.Equal("100", counters.Speed);
+        Assert.Equal("SERIAL-SW", cli.Hostname);
+    }
     [SerialIntegrationFact] public async Task RealSerialChannelHandlesFragmentedOutputAndSyslog()
     {
         using var channel = new SerialTerminalChannel(Device, 9600);

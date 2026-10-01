@@ -31,7 +31,7 @@ public partial class App : Application
                 System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "result.txt"), "FAIL: " + args.Exception);
                 args.Handled = true; Shutdown(1); return;
             }
-            MessageBox.Show("Une erreur inattendue est survenue. L'opération peut être partielle : reconnectez-vous et vérifiez l'état du switch.\n\n" + args.Exception.GetType().Name, "Switch Pilot", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("Une erreur inattendue est survenue dans l'application. Réessayez l'action ; si le problème persiste, redémarrez Switch Pilot.\n\n" + args.Exception.GetType().Name, "Switch Pilot", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };
     }
