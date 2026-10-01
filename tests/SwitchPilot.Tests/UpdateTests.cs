@@ -120,7 +120,9 @@ public class UpdateTests
             var content = File.ReadAllText(script);
             Assert.Contains(target, content);
             Assert.Contains(source, content);
-            Assert.Throws<InvalidOperationException>(() => installer.CreateApplyScript(Path.Combine(directory, "%TEMP%\\SwitchPilot.exe"), source));
+            // Keep the parent directory real on Windows and Unix: a backslash would
+            // introduce a missing directory on Windows before the unsafe-path check.
+            Assert.Throws<InvalidOperationException>(() => installer.CreateApplyScript(Path.Combine(directory, "%TEMP%-SwitchPilot.exe"), source));
         }
         finally { Directory.Delete(directory, true); if (Directory.Exists(staging)) Directory.Delete(staging, true); }
     }
