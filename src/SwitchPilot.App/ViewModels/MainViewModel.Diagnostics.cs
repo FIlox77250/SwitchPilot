@@ -1,5 +1,6 @@
 using SwitchPilot.Core;
 using SwitchPilot.Core.Cisco;
+using SwitchPilot.Core.Platforms;
 using SwitchPilot.Core.Diagnostics;
 using SwitchPilot.Core.Discovery;
 using SwitchPilot.Infrastructure.Diagnostics;
@@ -53,7 +54,7 @@ public sealed partial class MainViewModel
         finally { measuringLocal = false; }
     }
     private bool CanCompareSwitch => macDetection?.DirectCandidate == true && Adapter?.Id == macAdapter && CurrentGeneration == macGeneration &&
-        Neighbors.All(n => NeighborCorrelation.SameSwitch(n.SwitchName, macDetection.SwitchName) && CiscoParser.NormalizeInterface(n.Port).Equals(macDetection.Port.Name, StringComparison.OrdinalIgnoreCase));
+        Neighbors.All(n => NeighborCorrelation.SameSwitch(n.SwitchName, macDetection.SwitchName) && PortNames.Same(n.Port, macDetection.Port.Name));
     private async Task AutomaticPassive(CancellationToken ct)
     {
         if (!CanCompareSwitch || driver is null || Adapter is null) return;

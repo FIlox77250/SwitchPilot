@@ -33,8 +33,11 @@ public sealed class SshSession : TerminalSession
         // PuTTY and OpenSSH accept both "password" and "keyboard-interactive"; many switches
         // (including Allied Telesis) only advertise keyboard-interactive. Offer both so the
         // same credentials work everywhere instead of failing on the authentication method.
-        var password = new PasswordAuthenticationMethod(profile.Username, profile.Password);
-        var keyboard = new KeyboardInteractiveAuthenticationMethod(profile.Username);
+        // RouterOS reads terminal options from the login name: "+ct240w" disables colours and
+        // terminal detection and sets a 240-column width, so prompts and outputs stay parseable.
+        var username = !profile.AutoDetectVendor && profile.Vendor == SwitchVendor.MikroTik && !profile.Username.Contains('+') ? profile.Username + "+ct240w" : profile.Username;
+        var password = new PasswordAuthenticationMethod(username, profile.Password);
+        var keyboard = new KeyboardInteractiveAuthenticationMethod(username);
         keyboard.AuthenticationPrompt += (_, e) =>
         {
             foreach (var prompt in e.Prompts)
@@ -43,10 +46,10 @@ public sealed class SshSession : TerminalSession
                 // "Password for user:" contains "user": test the password keywords first, and
                 // default to the password when the prompt asks for neither.
                 prompt.Response = Regex.IsMatch(request, "password|passcode|secret", RegexOptions.IgnoreCase) || !Regex.IsMatch(request, "user|login|name", RegexOptions.IgnoreCase)
-                    ? profile.Password : profile.Username;
+                    ? profile.Password : username;
             }
         };
-        var info = new ConnectionInfo(profile.Host.Trim(), profile.Port, profile.Username, password, keyboard) { Timeout = TimeSpan.FromSeconds(15) };
+        var info = new ConnectionInfo(profile.Host.Trim(), profile.Port, username, password, keyboard) { Timeout = TimeSpan.FromSeconds(15) };
         if (!legacyAlgorithms)
         {
             foreach (var key in info.KeyExchangeAlgorithms.Keys.Where(k => k.Contains("sha1")).ToArray()) info.KeyExchangeAlgorithms.Remove(key);

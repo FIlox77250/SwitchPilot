@@ -1,14 +1,14 @@
-# Switch Pilot 1.0.9
+# Switch Pilot 1.1.0
 
-Application Windows de gestion de switchs Cisco IOS et Allied Telesis (AlliedWare Plus et anciennes séries AT-S95 / AT-8000GS), centrée sur le branchement Ethernet du poste. Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
+Application Windows de gestion de switchs multi-constructeurs, centrée sur le branchement Ethernet du poste. Cisco IOS et Allied Telesis (AlliedWare Plus, anciennes séries AT-S95 / AT-8000GS) sont les plateformes de référence. Cisco NX-OS, Arista EOS, Dell OS6/OS9/OS10, Huawei VRP, Juniper Junos, MikroTik RouterOS, Ubiquiti EdgeSwitch et UniFi sont pris en charge à titre expérimental (version 1.1.0). Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.0.9/SwitchPilot.exe) · [Release v1.0.9 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.0.9)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.1.0/SwitchPilot.exe) · [Release v1.1.0 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.1.0)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
-[Installation](docs/INSTALLATION.md) · [Dépannage](docs/TROUBLESHOOTING.md) · [Changements](CHANGELOG.md) · [Validation et limites](docs/VALIDATION.md)
+[Installation](docs/INSTALLATION.md) · [Dépannage](docs/TROUBLESHOOTING.md) · [Changements](CHANGELOG.md) · [Architecture multi-constructeurs](docs/ARCHITECTURE.md) · [Validation et limites](docs/VALIDATION.md)
 
 Au démarrage, l’assistant vérifie Npcap et propose **Installer maintenant** ou **Plus tard**. Sans Npcap, SSH, console et mesures locales restent disponibles. La question est reposée au prochain démarrage. **Paramètres → Dépendances** permet de vérifier ou de réparer l’installation à tout moment.
 
@@ -27,7 +27,7 @@ Le mode **Technicien** affiche le lien, le switch, le port, le VLAN et le verdic
 | Technicien | Résultat copiable, notifications Windows discrètes, inventaire local des prises et import/export CSV. |
 | Sauvegardes | Copie chiffrée automatique de la running-config avant chaque modification réelle, export chiffré, lecture et comparaison en mémoire, `write memory` séparé. |
 | Mises à jour | Vérification des releases GitHub au démarrage, proposition de la nouvelle version, téléchargement de l’exécutable portable, vérification de l’empreinte SHA-256, remplacement puis redémarrage. Vérification manuelle dans Paramètres ; une version peut être ignorée. |
-| Constructeurs | Dialogue de connexion avec choix Cisco IOS, Allied Telesis AlliedWare Plus ou Allied Telesis ancienne série (AT-S95 / AT-8000GS). Les ports `port1.0.1` et `g1` sont reconnus ; les VLANs et modes access/trunk sont lus depuis `show vlan brief` (AW+) ou `show vlan` / `show interfaces status` (AT-S95). |
+| Constructeurs | Détection automatique (prompt, `show version`, `show system`, `display version`) ou choix manuel parmi 13 plateformes. Référence : Cisco IOS / IOS-XE, Allied Telesis AW+ et AT-S95 (lecture seule). Expérimental : NX-OS, Arista EOS, Dell OS6/OS9/OS10, Huawei VRP, Junos (commit/rollback), RouterOS, EdgeSwitch, UniFi (API contrôleur ou SSH local en lecture). La validation suit chaque OS : `write memory`, `save`, `commit` ou application immédiate. |
 
 Npcap n’est pas inclus dans l’exécutable. L’utilisateur termine son installateur lui-même ; aucune option silencieuse `/S` n’est utilisée. Les options demandées sont `/winpcap_mode=yes /admin_only=no /no_kill=yes`. Une installation réservée aux administrateurs laisse la capture désactivée dans Switch Pilot. Les pilotes console FTDI, Prolific, Silicon Labs et Cisco sont signalés avec des indications d’installation ; aucun pilote Cisco n’est téléchargé automatiquement. Voir [le guide et la licence Npcap](https://npcap.com/guide/npcap-users-guide.html).
 
@@ -104,11 +104,11 @@ L’exécutable livré n’est pas signé. Republier lors des mises à jour de s
 
 ## Architecture
 
-- `SwitchPilot.Core` : modèles, plans de commandes validés, parsing Cisco, règles de sécurité, annonces/TTL, corrélation MAC, verdict câble et inventaire CSV.
-- `SwitchPilot.Infrastructure` : automate CLI commun dans `Terminal`, transports `Ssh` et `Serial`, pilote Cisco, dépendances Windows/Npcap, surveillance réseau, mesures et stockage.
+- `SwitchPilot.Core` : modèles, plans de commandes validés, plateformes et dialectes (`Platforms`), parseurs regex/TextFSM/JSON (`Parsing`), règles de sécurité, annonces/TTL, corrélation MAC, verdict câble et inventaire CSV.
+- `SwitchPilot.Infrastructure` : automate CLI commun dans `Terminal`, transports `Ssh` et `Serial`, pilotes dans `Drivers` (classe `SwitchDriver`, factory et détection), dépendances Windows/Npcap, surveillance réseau, mesures et stockage.
 - `SwitchPilot.App` : WPF/MVVM, connexion, dépendances, paramètres, inventaire et orchestration des diagnostics.
 - `tests` : fixtures synthétiques, tests unitaires et émulateurs SSH/série ; `build` : scripts de publication et test graphique.
 
-Un autre constructeur peut implémenter `ISwitchDriver` ; les transports partagent `ICliSession` et `ITerminalChannel`. La conversation sérialise les échanges, traite les prompts/pagination/syslogs, borne les réponses et ferme une session désynchronisée après délai, annulation ou confirmation inattendue.
+Chaque constructeur dérive de `SwitchDriver` (voir [ARCHITECTURE.md](docs/ARCHITECTURE.md)) ; les transports partagent `ICliSession` et `ITerminalChannel`. La conversation sérialise les échanges, traite les prompts/pagination/syslogs, borne les réponses et ferme une session désynchronisée après délai, annulation ou confirmation inattendue.
 
 Les [mesures de performance historiques 1.0.1](docs/PERFORMANCE.md) restent disponibles ; elles ne sont pas des mesures de la 1.0.8.

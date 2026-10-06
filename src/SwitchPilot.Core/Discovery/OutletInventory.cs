@@ -8,7 +8,7 @@ public static class OutletCsv
         foreach (var value in new[] { entry.Switch, entry.Outlet })
             if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl) || "=+-@".Contains(value.TrimStart()[0]))
                 throw new ArgumentException("Nom de switch ou de prise invalide (256 caractères, sans contrôle ni formule de tableur).");
-        return entry with { Switch = entry.Switch.Trim(), Port = CommandPlan.Interface(entry.Port), Outlet = entry.Outlet.Trim() };
+        return entry with { Switch = entry.Switch.Trim(), Port = Platforms.PortNames.Inventory(entry.Port), Outlet = entry.Outlet.Trim() };
     }
     public static string Export(IEnumerable<OutletEntry> entries)
     {

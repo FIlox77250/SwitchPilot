@@ -2,19 +2,20 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
   <StackPanel Margin="32">
     <TextBlock Text="Connecter un switch" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,8"/>
-    <TextBlock Text="Cisco IOS ou Allied Telesis · SSH ou connexion console locale" Style="{StaticResource MutedText}" Margin="0,0,0,24"/>
-    <TextBlock Text="Type de switch" Style="{StaticResource Label}"/>
-    <ComboBox x:Name="Vendor" SelectedIndex="0">
-      <ComboBoxItem Content="Détection automatique (recommandé)"/>
-      <ComboBoxItem Content="Cisco IOS"/>
-      <ComboBoxItem Content="Allied Telesis · AlliedWare Plus"/>
-      <ComboBoxItem Content="Allied Telesis · ancienne série (AT-8000GS · logiciel AT-S95)"/>
-    </ComboBox>
+    <TextBlock Text="Cisco, Allied Telesis, Arista, Dell, Huawei, Juniper, MikroTik, Ubiquiti · SSH, console locale ou API UniFi" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,24"/>
     <TextBlock Text="Profils enregistrés" Style="{StaticResource Label}"/>
     <ComboBox x:Name="Profiles" DisplayMemberPath="Label" SelectionChanged="ProfileChanged"/>
+    <TextBlock Text="Mode de connexion" Style="{StaticResource Label}"/>
     <ComboBox x:Name="Mode" SelectedIndex="0" SelectionChanged="ModeChanged">
-      <ComboBoxItem Content="SSH"/><ComboBoxItem Content="Console série · connexion locale"/>
+      <ComboBoxItem Content="SSH"/><ComboBoxItem Content="Console série · connexion locale"/><ComboBoxItem Content="API contrôleur UniFi · HTTPS"/>
     </ComboBox>
+    <StackPanel x:Name="VendorFields">
+      <TextBlock Text="Type de switch" Style="{StaticResource Label}"/>
+      <ComboBox x:Name="Vendor" SelectedIndex="0" SelectionChanged="VendorChanged">
+        <ComboBoxItem Content="Détection automatique (recommandé)"/>
+      </ComboBox>
+      <TextBlock x:Name="PlatformNote" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,12" Visibility="Collapsed"/>
+    </StackPanel>
     <StackPanel x:Name="SerialFields" Visibility="Collapsed">
       <TextBlock Text="Port console" Style="{StaticResource Label}"/>
       <ComboBox x:Name="SerialPorts" DisplayMemberPath="Label"/>
@@ -30,24 +31,42 @@
         <ColumnDefinition Width="90"/>
       </Grid.ColumnDefinitions>
       <StackPanel Margin="0,0,14,0">
-        <TextBlock Text="Adresse IP ou nom DNS" Style="{StaticResource Label}"/>
+        <TextBlock x:Name="HostLabel" Text="Adresse IP ou nom DNS" Style="{StaticResource Label}"/>
         <TextBox x:Name="Host" MaxLength="253" AutomationProperties.Name="Adresse du switch"/>
       </StackPanel>
       <StackPanel Grid.Column="1">
         <TextBlock Text="Port" Style="{StaticResource Label}"/>
-        <TextBox x:Name="Port" Text="22" MaxLength="5" AutomationProperties.Name="Port SSH"/>
+        <TextBox x:Name="Port" Text="22" MaxLength="5" AutomationProperties.Name="Port"/>
       </StackPanel>
     </Grid>
+    <Grid x:Name="ApiFields" Visibility="Collapsed">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="150"/>
+        <ColumnDefinition/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Margin="0,0,14,0">
+        <TextBlock Text="Site" Style="{StaticResource Label}"/>
+        <TextBox x:Name="Site" Text="default" MaxLength="64" AutomationProperties.Name="Site UniFi"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1">
+        <TextBlock Text="Switch (MAC ou nom, si plusieurs)" Style="{StaticResource Label}"/>
+        <TextBox x:Name="Device" MaxLength="64" AutomationProperties.Name="Switch UniFi"/>
+      </StackPanel>
+    </Grid>
+    <TextBlock x:Name="ApiNote" Visibility="Collapsed" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,12"
+               Text="Utilisez un compte administrateur local du contrôleur (UniFi Network ou UniFi OS), sans double authentification. Un certificat auto-signé est vérifié par son empreinte à la première connexion."/>
     <TextBlock Text="Utilisateur" Style="{StaticResource Label}"/>
     <TextBox x:Name="Username" MaxLength="128"/>
     <TextBlock Text="Mot de passe" Style="{StaticResource Label}"/>
     <PasswordBox x:Name="Password"/>
-    <TextBlock Text="Mot de passe enable (si nécessaire)" Style="{StaticResource Label}"/>
-    <PasswordBox x:Name="EnablePassword"/>
+    <StackPanel x:Name="EnableFields">
+      <TextBlock Text="Mot de passe enable (si nécessaire)" Style="{StaticResource Label}"/>
+      <PasswordBox x:Name="EnablePassword"/>
+    </StackPanel>
     <CheckBox x:Name="Remember" Content="Mémoriser les identifiants, chiffrés pour ce compte Windows" Margin="0,4,0,14"/>
-    <CheckBox x:Name="Legacy" Content="Compatibilité SSH ancien IOS (algorithmes hérités)" Margin="0,0,0,8"/>
-    <TextBlock x:Name="LegacyNote" Text="Activez cette option seulement si votre ancien IOS refuse la négociation SSH moderne. La clé du switch reste vérifiée." Style="{StaticResource MutedText}" Margin="0,0,0,20"/>
-    <TextBlock x:Name="Error" Foreground="#A04D3F" Margin="0,0,0,10"/>
+    <CheckBox x:Name="Legacy" Content="Compatibilité SSH ancien firmware (algorithmes hérités)" Margin="0,0,0,8"/>
+    <TextBlock x:Name="LegacyNote" Text="Activez cette option seulement si votre ancien switch (IOS, EdgeSwitch…) refuse la négociation SSH moderne. La clé du switch reste vérifiée." Style="{StaticResource MutedText}" Margin="0,0,0,20"/>
+    <TextBlock x:Name="Error" Foreground="#A04D3F" TextWrapping="Wrap" Margin="0,0,0,10"/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
       <Button Content="Annuler" IsCancel="True"/>
       <Button Content="Se connecter" Click="Connect" IsDefault="True" Style="{StaticResource PrimaryButton}"/>

@@ -1,4 +1,24 @@
-# Validation de Switch Pilot 1.0.9
+# Validation de Switch Pilot 1.1.0
+
+État au 6 octobre 2026.
+
+## Version 1.1.0 : vérifications locales
+
+Environnement : Windows 11 Pro, SDK .NET 10.0.401.
+
+- Compilation de toute la solution : **zéro erreur, zéro avertissement**.
+- Suite complète : **515 tests réussis, 11 ignorés, 0 échec, 526 au total**. Les 306 nouveaux tests couvrent :
+  - les parseurs Huawei, Junos, RouterOS, EdgeSwitch, NX-OS, Arista, Dell OS6/OS9/OS10 et UniFi (shell et JSON) ;
+  - le moteur TextFSM ;
+  - les grammaires de ports et les dialectes de configuration ;
+  - la factory et la détection automatique ;
+  - le pipeline d'écriture de chaque pilote : simulation, sauvegarde obligatoire, garde de sécurité, commit Huawei à deux étapes, commit / rollback Junos, récupération EdgeSwitch, lecture seule UniFi SSH ;
+  - le pilote du contrôleur UniFi face à un contrôleur HTTP simulé : classique et UniFi OS, CSRF, reconnexion, corps `port_overrides`, `networkconf`, empreinte de certificat.
+- Cinq défauts de parsing trouvés par ces tests ont été corrigés (voir le [CHANGELOG](../CHANGELOG.md)).
+
+**Limite importante** : les nouvelles plateformes (NX-OS, EOS, Dell, Huawei, Junos, RouterOS, EdgeSwitch, UniFi) sont validées uniquement sur des sorties de référence (fixtures) construites à partir de la documentation des constructeurs. Aucun de ces équipements n'a été connecté. Elles sont marquées **expérimentales** dans l'application. Avant tout usage en production, valider sur un port de laboratoire, en simulation puis en écriture, la lecture des ports/VLANs, le changement de VLAN access et la sauvegarde ou le commit.
+
+## Version 1.0.9
 
 État au 1er octobre 2026. Ce rapport distingue les tests exécutés des parcours seulement préparés et des essais matériels restants. Les compteurs des rapports TRX sont consignés dans [test-results.json](test-results.json).
 

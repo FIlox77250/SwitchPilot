@@ -9,11 +9,16 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
     private int disposed;
     public abstract ConnectionKind Kind { get; }
     public string Hostname => Conversation.Hostname;
+    public string Prompt => Conversation.Prompt;
+    public PromptKind PromptKind => Conversation.Kind;
     public bool IsConnected
     {
         get { try { return Volatile.Read(ref disposed) == 0 && channel.IsOpen; } catch (ObjectDisposedException) { return false; } }
     }
-    public async Task<string> ExecuteAsync(string command, CancellationToken cancellationToken = default)
+    public Task<string> ExecuteAsync(string command, CancellationToken cancellationToken = default) => RunAsync(command, null, cancellationToken);
+    public Task<string> ExecuteConfirmedAsync(string command, string answer, CancellationToken cancellationToken = default) =>
+        RunAsync(command, answer ?? throw new ArgumentNullException(nameof(answer)), cancellationToken);
+    private async Task<string> RunAsync(string command, string? confirmAnswer, CancellationToken cancellationToken)
     {
         await gate.WaitAsync(cancellationToken);
         try
@@ -26,7 +31,7 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
                 Conversation.CurrentCommandLogMask = CliTrace.IsSensitive(command) ? command : null;
                 try
                 {
-                    var result = await Conversation.CommandAsync(command, cancellationToken);
+                    var result = await Conversation.CommandAsync(command, cancellationToken, confirmAnswer);
                     CliTrace.Line("<=", CliTrace.IsSensitive(command) ? "" : result, mask: CliTrace.IsSensitive(command));
                     return result;
                 }
@@ -38,7 +43,7 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
                 Conversation.CurrentCommandLogMask = CliTrace.IsSensitive(command) ? command : null;
                 try
                 {
-                    var result = await Conversation.CommandAsync(command, cancellationToken);
+                    var result = await Conversation.CommandAsync(command, cancellationToken, confirmAnswer);
                     CliTrace.Line("<=", CliTrace.IsSensitive(command) ? "" : result, mask: CliTrace.IsSensitive(command));
                     return result;
                 }
@@ -51,7 +56,7 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
                 CliTrace.Line("! ", command + " → élévation privilegee", mask: true);
                 try { await Conversation.EnsurePrivilegedAsync(secret, cancellationToken); }
                 catch (CliException) { throw e; }
-                return await Conversation.CommandAsync(command, cancellationToken);
+                return await Conversation.CommandAsync(command, cancellationToken, confirmAnswer);
             }
         }
         catch (Exception e) when (e is TimeoutException or OperationCanceledException or IOException)
@@ -59,7 +64,8 @@ public abstract class TerminalSession(ITerminalChannel channel, string enablePas
         finally { gate.Release(); }
     }
     private static bool RequiresPrivilege(string command) =>
-        command is "configure terminal" or "write memory" or "show running-config" or "copy running-config startup-config"
+        command is "configure terminal" or "configure" or "vlan database" or "write memory" or "show running-config" or "copy running-config startup-config"
+            or "show running-configuration" or "copy running-configuration startup-configuration"
         || command.StartsWith("test cable-diagnostics") || command.StartsWith("show cable-diagnostics");
     public ValueTask DisposeAsync()
     {

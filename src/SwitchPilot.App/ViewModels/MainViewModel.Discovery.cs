@@ -1,6 +1,7 @@
 using System.Windows;
 using SwitchPilot.Core;
 using SwitchPilot.Core.Cisco;
+using SwitchPilot.Core.Platforms;
 using SwitchPilot.Core.Discovery;
 using SwitchPilot.Infrastructure.Discovery;
 namespace SwitchPilot.App.ViewModels;
@@ -75,7 +76,7 @@ public sealed partial class MainViewModel
     private void RenderDetection()
     {
         var announcements = Neighbors;
-        var distinct = announcements.Select(n => (n.SwitchName.ToLowerInvariant(), CiscoParser.NormalizeInterface(n.Port))).Distinct().ToArray();
+        var distinct = announcements.Select(n => (n.SwitchName.ToLowerInvariant(), PortNames.Key(n.Port))).Distinct().ToArray();
         var neighbor = distinct.Length == 1 ? announcements.LastOrDefault() : null;
         if (macDetection is { } mac && Adapter?.Id == macAdapter && CurrentGeneration == macGeneration)
         {

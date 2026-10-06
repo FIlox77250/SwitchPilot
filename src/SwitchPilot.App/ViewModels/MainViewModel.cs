@@ -13,8 +13,10 @@ using SwitchPilot.Core;
 using SwitchPilot.Core.Cisco;
 using SwitchPilot.Core.Diagnostics;
 using SwitchPilot.Core.Discovery;
+using SwitchPilot.Core.Platforms;
 using SwitchPilot.Infrastructure.Cisco;
 using SwitchPilot.Infrastructure.Discovery;
+using SwitchPilot.Infrastructure.Drivers;
 using SwitchPilot.Infrastructure.Serial;
 using SwitchPilot.Infrastructure.Ssh;
 using SwitchPilot.Infrastructure.Terminal;
@@ -37,7 +39,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly DetectionSchedule detectionSchedule = new();
     private bool busy, dryRun = true;
     private string status = "Prêt. Connectez un switch ou explorez la démonstration.", connection = "Aucun switch connecté", search = "";
-    private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH · Cisco IOS ou Allied Telesis", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
+    private string resultSwitch = "Votre point de connexion", resultPort = "—", resultVlan = "—", resultSpeed = "—", resultDuplex = "—", detectionNote = "Connectez un switch pour retrouver votre carte Ethernet dans sa table MAC.", source = "Aucune détection", model = "SSH, console ou API UniFi · multi-constructeurs", passiveNote = "Sélectionnez un port, puis lancez le contrôle passif.", captureNote = "Capture optionnelle : nécessite Npcap et des annonces LLDP/CDP.", counters = "CRC —   ·   Collisions —   ·   Erreurs entrantes —", tdrNote = "Aucun test lancé.", detectionSummary = "";
     private LocalAdapter? adapter;
     private PortInfo? selectedPort;
     private VlanInfo? selectedVlan;
@@ -143,14 +145,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         CaptureCommand = new RelayCommand(() => Run("Écoute LLDP/CDP", Capture), () => !IsBusy && Adapter != null && !IsDemo);
         RefreshAdaptersCommand = new RelayCommand(RefreshAdapters, () => !IsBusy && !IsDemo);
         ViewPortCommand = new RelayCommand(() => { SelectedPort = Ports.FirstOrDefault(p => p.Name == ResultPort); Tab = 1; }, () => Ports.Any(p => p.Name == ResultPort));
-        AccessCommand = Change(() => CommandPlan.Access(SelectedPort!.Name, ParseVlan()), CanEditPort);
+        AccessCommand = Change(() => CommandPlan.Access(SelectedPort!.Name, ParseVlan(), ActiveVendor, CurrentAccessVlan(SelectedPort!)), CanEditPort);
         TrunkCommand = Change(() => CommandPlan.Trunk(SelectedPort!.Name, int.Parse(NativeVlan), AllowedVlans, ActiveVendor), CanEditPort);
-        EnableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, true), CanEditPort);
-        DisableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, false), CanEditPort);
+        EnableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, true, ActiveVendor), CanEditPort);
+        DisableCommand = Change(() => CommandPlan.Enabled(SelectedPort!.Name, false, ActiveVendor), CanEditPort);
         DescriptionCommand = Change(() => CommandPlan.Describe(SelectedPort!.Name, Description, ActiveVendor), CanEditPort);
-        CreateVlanCommand = Change(() => CommandPlan.CreateVlan(ParseVlan(), VlanName), CanRead);
-        DeleteVlanCommand = Change(() => CommandPlan.DeleteVlan(SelectedVlan!.Id), () => CanRead() && SelectedVlan != null);
-        SaveCommand = Change(CommandPlan.Save, CanRead);
+        CreateVlanCommand = Change(() => CommandPlan.CreateVlan(ParseVlan(), VlanName, ActiveVendor), CanRead);
+        DeleteVlanCommand = Change(() => CommandPlan.DeleteVlan(SelectedVlan!.Id, ActiveVendor, SelectedVlan.Name), () => CanRead() && SelectedVlan != null);
+        SaveCommand = Change(() => CommandPlan.Save(ActiveVendor), CanRead);
         ExportCommand = new RelayCommand(() => Run("Export chiffré", Export), CanRead);
         OpenBackupCommand = new RelayCommand(OpenBackup, () => !IsBusy);
         PassiveCommand = new RelayCommand(() => Run("Contrôle passif", Passive), CanEditPort);
@@ -159,7 +161,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         AboutCommand = new RelayCommand(() =>
         {
             var assembly = typeof(MainViewModel).Assembly;
-            var text = new System.Text.StringBuilder($"Switch Pilot · {assembly.GetName().Version?.ToString(3)}\nGestion de switchs Cisco IOS\n\n");
+            var text = new System.Text.StringBuilder($"Switch Pilot · {assembly.GetName().Version?.ToString(3)}\nGestion de switchs multi-constructeurs : " +
+                string.Join(", ", SwitchPlatforms.All.Select(p => p.ShortName)) + "\n\n");
             foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.StartsWith("SwitchPilot.Notices") || n.StartsWith("SwitchPilot.Licenses")))
             {
                 using var reader = new StreamReader(assembly.GetManifestResourceStream(resource)!);
@@ -188,10 +191,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private bool CanRead() => !IsBusy && Connected;
     private bool CanEditPort() => CanRead() && SelectedPort != null;
     private int ParseVlan() => int.TryParse(VlanId, out var value) ? value : throw new ArgumentException("Numéro de VLAN invalide.");
+    /// <summary>Access VLAN shown for the port; platforms with per-VLAN membership remove the port from it.</summary>
+    private static int? CurrentAccessVlan(PortInfo port) =>
+        int.TryParse(port.Vlan, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id is >= 1 and <= 4094 and not (>= 1002 and <= 1005) ? id : null;
     private ICommand Change(Func<CommandPlan> build, Func<bool> can) => new RelayCommand(() => Run("Configuration", async ct =>
     {
         var plan = build();
-        if (!Dialogs.Preview(plan, DryRun)) return;
+        if (!Dialogs.Preview(plan, DryRun, IsDemo ? null : SwitchPlatforms.Get(plan.Vendor))) return;
         var safety = DryRun || plan.Kind is not (ChangeKind.DisablePort or ChangeKind.AccessVlan or ChangeKind.Trunk) ? SafetyContext.Unknown : await Safety(ct);
         await driver!.ApplyAsync(plan, DryRun, ct, safety);
         if (!DryRun) { await Refresh(ct); ClearDetection(); }
@@ -238,6 +244,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         var dialog = new ConnectionWindow(store.Settings.Profiles);
         if (dialog.ShowDialog() != true || dialog.Profile is null) return;
         var selected = dialog.Profile; var legacy = dialog.LegacyAlgorithms;
+        if (selected.Kind == ConnectionKind.Api) { Run("Connexion au contrôleur UniFi", ct => ConnectApi(selected, ct)); return; }
         Run(selected.Kind == ConnectionKind.Serial ? "Connexion console" : "Connexion SSH", async ct =>
         {
             await Disconnect(); monitor.EnableCapture(Dependencies.Available);
@@ -247,15 +254,16 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 : await Task.Run(() => SshSession.ConnectAsync(selected, Trust, legacy, ct), ct); }
             catch (Exception e) when (!legacy && SshSession.IsNegotiationFailure(e))
             {
-                if (!Dialogs.Confirm("La négociation SSH moderne a échoué. Réessayer avec les algorithmes hérités pour un ancien IOS ? La clé du switch restera vérifiée.", "Compatibilité ancien IOS")) return;
+                if (!Dialogs.Confirm("La négociation SSH moderne a échoué. Réessayer avec les algorithmes hérités pour un ancien firmware (IOS, EdgeSwitch…) ? La clé du switch restera vérifiée.", "Compatibilité ancien firmware")) return;
                 legacy = true;
                 session = await Task.Run(() => SshSession.ConnectAsync(selected, Trust, true, ct), ct);
             }
             var detected = (SwitchVendor?)null;
             if (selected.AutoDetectVendor)
             {
-                try { detected = SwitchVendorDetector.Detect(await session.ExecuteAsync("show version", ct)); }
-                catch (CliException) { /* Inconclusive: try both families below. */ }
+                // Prompt shape first, then read-only identity commands (show version, display version…).
+                try { detected = await SwitchDriverFactory.DetectAsync(session, ct); }
+                catch (CliException) { /* Inconclusive: try the reference families below. */ }
             }
             // Auto-detect: trust a conclusive banner, otherwise probe both command sets in turn
             // rather than defaulting to Cisco, so a wrong family cannot fail on both transports.
@@ -280,7 +288,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                     audit.Write("Détection du constructeur", $"Lecture impossible avec {VendorName(candidate)} : {e.GetType().Name}.");
                 }
             }
-            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité ancien IOS" : "Connecté") + $" · {VendorName(vendor)}.");
+            audit.Write(selected.Kind == ConnectionKind.Serial ? "Connexion console locale" : "Connexion SSH", (legacy ? "Connecté avec compatibilité SSH héritée" : "Connecté") + $" · {VendorName(vendor)}.");
+            if (readError is null && SwitchPlatforms.Get(vendor).IsExperimental) Status += " Plateforme expérimentale : vérifiez chaque aperçu de commandes.";
             Raise(nameof(IsDemo)); Raise(nameof(Connected));
             if (readError is not null)
             {
@@ -291,18 +300,36 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             }
         });
     }
-    private ISwitchDriver CreateDriver(ICliSession session, SwitchVendor vendor) => vendor switch
+    private ISwitchDriver CreateDriver(ICliSession session, SwitchVendor vendor) =>
+        SwitchDriverFactory.Create(vendor, session, audit, new ConfigurationBackup(store.DirectoryPath));
+    private static string VendorName(SwitchVendor vendor) =>
+        SwitchPlatforms.Get(vendor) is var platform && platform.IsExperimental ? platform.DisplayName + " (expérimental)" : SwitchPlatforms.Get(vendor).DisplayName;
+    private async Task ConnectApi(ConnectionProfile selected, CancellationToken ct)
     {
-        SwitchVendor.AlliedTelesis => new SwitchPilot.Infrastructure.Allied.AlliedTelesisDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath)),
-        SwitchVendor.AlliedS95 => new SwitchPilot.Infrastructure.Allied.AlliedS95Driver(session, audit),
-        _ => new CiscoIosDriver(session, audit, backup: new ConfigurationBackup(store.DirectoryPath)),
-    };
-    private static string VendorName(SwitchVendor vendor) => vendor switch
+        await Disconnect(); monitor.EnableCapture(Dependencies.Available);
+        var api = await Task.Run(() => UniFiControllerDriver.ConnectAsync(selected, TrustCertificate, audit, new ConfigurationBackup(store.DirectoryPath), ct), ct);
+        profile = selected with { Password = "", EnablePassword = "" };
+        store.SaveProfile(selected);
+        driver = api;
+        Exception? readError = null;
+        try { await Refresh(ct); await Detect(ct); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception e) { readError = e; }
+        Raise(nameof(IsDemo)); Raise(nameof(Connected));
+        Status = readError is null
+            ? $"Connecté au contrôleur {(api.IsUniFiOs ? "UniFi OS" : "UniFi")}. Plateforme expérimentale : vérifiez chaque aperçu de requête."
+            : "Connecté au contrôleur, mais la lecture du switch a échoué : " + FriendlyError(readError);
+    }
+    /// <summary>Trust on first use of a self-signed controller certificate, stored like SSH host keys.</summary>
+    private bool TrustCertificate(string endpoint, string fingerprint) => dispatcher.Invoke(() =>
     {
-        SwitchVendor.AlliedTelesis => "Allied Telesis · AlliedWare Plus",
-        SwitchVendor.AlliedS95 => "Allied Telesis · AT-S95 (AT-8000GS)",
-        _ => "Cisco IOS",
-    };
+        var known = store.KnownFingerprint(endpoint);
+        if (known == fingerprint) return true;
+        var text = known == null ? $"Première connexion à {endpoint}.\n\nLe certificat HTTPS du contrôleur n'est pas signé par une autorité reconnue (cas habituel d'un contrôleur UniFi).\n\nEmpreinte :\n{fingerprint}\n\nComparez-la avec celle affichée par votre navigateur avant de l'accepter." :
+            $"Le certificat HTTPS de {endpoint} a changé.\n\nAncien : {known}\nNouveau : {fingerprint}\n\nN'acceptez que si ce changement a été vérifié (renouvellement du certificat).";
+        if (!Dialogs.Confirm(text, "Vérification du certificat du contrôleur")) return false;
+        store.Trust(endpoint, fingerprint); return true;
+    });
     private bool Trust(string host, string fingerprint) => dispatcher.Invoke(() =>
     {
         var known = store.KnownFingerprint(host);
@@ -325,7 +352,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         switchMeasurement = previousSwitchMeasurement = null; measuredSwitch = ""; measuredAdapter = ""; measuredGeneration = -1;
         driver = null; profile = null; snapshot = null; Ports.Clear(); Vlans.Clear(); TdrPairs.Clear(); SelectedPort = null; SelectedVlan = null;
         monitor.EnableCapture(Dependencies.Available);
-        Connection = "Aucun switch connecté"; Model = "SSH · Cisco IOS ou Allied Telesis"; ClearDetection(); RefreshAdapters();
+        Connection = "Aucun switch connecté"; Model = "SSH, console ou API UniFi · multi-constructeurs"; ClearDetection(); RefreshAdapters();
         Raise(nameof(IsDemo)); Raise(nameof(Connected)); Raise(nameof(PortCount)); Status = "Déconnecté.";
     }
     private async Task Refresh(CancellationToken ct)
@@ -335,8 +362,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Ports.Clear(); foreach (var p in snapshot.Ports) Ports.Add(p);
         Vlans.Clear(); foreach (var v in snapshot.Vlans) Vlans.Add(v);
         SelectedPort = Ports.FirstOrDefault(p => p.Name == selected);
-        Connection = snapshot.Identity.Name + (IsDemo ? " · Démonstration" : driver.Kind == ConnectionKind.Serial ? " · Connexion console locale" : " · Connecté en SSH");
-        Model = snapshot.Identity.Model + " · IOS " + snapshot.Identity.IosVersion;
+        Connection = snapshot.Identity.Name + (IsDemo ? " · Démonstration" : driver.Kind switch
+        {
+            ConnectionKind.Serial => " · Connexion console locale",
+            ConnectionKind.Api => " · Contrôleur UniFi",
+            _ => " · Connecté en SSH"
+        });
+        Model = snapshot.Identity.Model + " · " + SwitchPlatforms.Get(ActiveVendor).ShortName + " " + snapshot.Identity.IosVersion
+            + (!IsDemo && SwitchPlatforms.Get(ActiveVendor).IsExperimental ? " · expérimental" : "");
         Raise(nameof(PortCount)); Status = "État des ports et VLAN actualisé.";
     }
     private async Task Passive(CancellationToken ct)
@@ -361,12 +394,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         var candidates = PortLocator.Find(selected.Mac, fresh, entries);
         var localMacs = NetworkDiscovery.Adapters().Select(a => a.Mac).ToHashSet();
         var protectedPorts = entries.Where(e => localMacs.Contains(e.Mac)).Select(e => e.Port).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var port in fresh.Ports.Where(p => p.IsTrunk || p.Name.StartsWith("Po"))) protectedPorts.Add(port.Name);
+        foreach (var port in fresh.Ports.Where(p => p.IsTrunk || PortNames.IsAggregate(p.Name))) protectedPorts.Add(port.Name);
         return new(true, candidates.Count == 1 && candidates[0].DirectCandidate, protectedPorts) { ObservedAt = observedAt, StillCurrent = StillCurrent };
     }
     private async Task Tdr(CancellationToken ct)
     {
         var port = SelectedPort!;
+        if (!IsDemo && SwitchPlatforms.Get(ActiveVendor) is { Tdr: false, IsExperimental: true } platform)
+            throw new NotSupportedException($"Le test de câble TDR n'est pas pris en charge sur {platform.DisplayName}. Utilisez le contrôle passif.");
         var safety = await Safety(ct); SafetyPolicy.RequireSafeTdr(port, safety, driver!.Kind);
         var commands = $"test cable-diagnostics tdr interface {port.Name}\nshow cable-diagnostics tdr interface {port.Name}";
         var warning = DryRun ? "Simulation : les commandes seront affichées et aucune ne sera envoyée." :

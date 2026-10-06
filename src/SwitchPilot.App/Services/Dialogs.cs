@@ -14,12 +14,16 @@ public static class Dialogs
         ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
     };
     public static bool Confirm(string text, string title) => MessageBox.Show(Application.Current.MainWindow, text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
-    public static bool Preview(CommandPlan plan, bool dryRun)
+    public static bool Preview(CommandPlan plan, bool dryRun, SwitchPilot.Core.Platforms.SwitchPlatform? platform = null)
     {
-        return PreviewText(plan.Title, plan.Preview, dryRun ? "Simulation : aucune commande de modification ne sera envoyée au switch." :
+        var note = dryRun ? "Simulation : aucune commande de modification ne sera envoyée au switch." :
             plan.Kind == ChangeKind.Save ? "La configuration active sera écrite dans la mémoire permanente du switch." :
-            "Ces commandes modifient immédiatement le switch et peuvent interrompre des connexions. En cas d'échec, les modifications peuvent être partielles. La sauvegarde permanente reste une action distincte.",
-            dryRun ? "Simuler uniquement" : "Appliquer au switch");
+            platform?.Save == SwitchPilot.Core.Platforms.SaveModel.Commit ? "Ces commandes sont validées ensemble par « commit » et deviennent permanentes ; en cas d'échec, la configuration candidate est annulée." :
+            platform?.Save == SwitchPilot.Core.Platforms.SaveModel.Implicit ? "Cette plateforme enregistre immédiatement chaque modification acceptée ; il n'y a pas de sauvegarde séparée. En cas d'échec, les modifications peuvent être partielles." :
+            "Ces commandes modifient immédiatement le switch et peuvent interrompre des connexions. En cas d'échec, les modifications peuvent être partielles. La sauvegarde permanente reste une action distincte.";
+        if (platform is { IsExperimental: true })
+            note += $"\n\n{platform.DisplayName} est une plateforme expérimentale (pilote construit d'après la documentation du constructeur, non validé sur matériel). Relisez chaque commande avant d'appliquer.";
+        return PreviewText(plan.Title, plan.Preview, note, dryRun ? "Simuler uniquement" : "Appliquer au switch");
     }
     public static bool PreviewText(string title, string commands, string note, string action)
     {

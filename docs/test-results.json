@@ -1,17 +1,17 @@
 {
-  "version": "1.0.9",
-  "environment": "Linux; .NET SDK 10.0.401; target win-x64/.NET 10.0.12",
+  "version": "1.1.0",
+  "environment": "Windows 11 Pro 10.0.26200; .NET SDK 10.0.401; Release",
   "regression": {
-    "total": 220,
-    "executed": 202,
-    "passed": 202,
+    "total": 526,
+    "executed": 515,
+    "passed": 515,
     "failed": 0,
-    "skipped": 18,
+    "skipped": 11,
     "timing": {
-      "creation": "2026-10-01T21:51:58.2408800+02:00",
-      "queuing": "2026-10-01T21:51:58.2408800+02:00",
-      "start": "2026-10-01T21:51:57.7171851+02:00",
-      "finish": "2026-10-01T21:52:13.4538015+02:00"
+      "creation": "2026-10-06T02:13:50.0101710+02:00",
+      "queuing": "2026-10-06T02:13:50.0101711+02:00",
+      "start": "2026-10-06T02:13:49.2573095+02:00",
+      "finish": "2026-10-06T02:14:07.3794559+02:00"
     },
     "skipped_tests": [
       "SwitchPilot.Tests.SerialIntegrationTests.RealSerialChannelDoesNotAcceptIosRefusal",
@@ -24,14 +24,7 @@
       "SwitchPilot.Tests.SshIntegrationTests.RejectingHostKeyPreventsConnection",
       "SwitchPilot.Tests.SshIntegrationTests.UnexpectedConfirmationClosesSession",
       "SwitchPilot.Tests.SshIntegrationTests.WrongEnablePasswordIsRejected",
-      "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected",
-      "SwitchPilot.Tests.StorageTests.CorruptedSettingsArePreservedForRecovery",
-      "SwitchPilot.Tests.StorageTests.ForgettingCredentialsRemovesThemFromPersistedProfiles",
-      "SwitchPilot.Tests.StorageTests.WindowsBackupIsEncryptedAndReadableByCurrentUser",
-      "SwitchPilot.Tests.Windows102Tests.AutomaticBackupIsEncryptedAndRecoverable",
-      "SwitchPilot.Tests.Windows102Tests.SerialProfilesAndOptionsSurviveDpapiRoundtrip",
-      "SwitchPilot.Tests.Windows102Tests.SkippedUpdateVersionSurvivesDpapiRoundtrip",
-      "SwitchPilot.Tests.Windows102Tests.UnsignedExecutableIsRejectedByAuthenticode"
+      "SwitchPilot.Tests.SshIntegrationTests.WrongPasswordIsRejected"
     ]
   }
 }

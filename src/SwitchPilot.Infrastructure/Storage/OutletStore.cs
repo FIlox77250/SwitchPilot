@@ -11,7 +11,7 @@ public sealed class OutletStore(string directory)
         var entries = JsonSerializer.Deserialize<List<OutletEntry>>(AtomicFile.ReadBounded(Pathname, 4 * 1024 * 1024)) ?? [];
         Entries.Clear(); Entries.AddRange(entries.Select(OutletCsv.Validate));
     }
-    public string Lookup(string hostname, string port) => Entries.FirstOrDefault(e => e.Switch.Equals(hostname, StringComparison.OrdinalIgnoreCase) && e.Port.Equals(Core.Cisco.CiscoParser.NormalizeInterface(port), StringComparison.OrdinalIgnoreCase))?.Outlet ?? "";
+    public string Lookup(string hostname, string port) => Entries.FirstOrDefault(e => e.Switch.Equals(hostname, StringComparison.OrdinalIgnoreCase) && Core.Platforms.PortNames.Same(e.Port, port))?.Outlet ?? "";
     public void Merge(IEnumerable<OutletEntry> entries)
     {
         var next = Entries.ToList();

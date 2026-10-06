@@ -28,7 +28,7 @@ public static class NeighborCorrelation
     public static string Compare(NeighborAnnouncement announcement, PortDetection detection)
     {
         if (!SameSwitch(announcement.SwitchName, detection.SwitchName)) return "Switch connecté différent du voisin annoncé : recoupement impossible.";
-        if (!Cisco.CiscoParser.NormalizeInterface(announcement.Port).Equals(detection.Port.Name, StringComparison.OrdinalIgnoreCase))
+        if (!Platforms.PortNames.Same(announcement.Port, detection.Port.Name))
             return "Incohérence : le port LLDP/CDP diffère de celui de la table MAC.";
         return announcement.Vlan is { } vlan && vlan != detection.Entry.Vlan
             ? "Port concordant ; VLAN annoncé différent du VLAN MAC (il peut s’agir du VLAN natif)."

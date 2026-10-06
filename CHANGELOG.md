@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.1.0 — 6 octobre 2026
+
+Switch Pilot devient multi-constructeurs grâce à une architecture de pilotes (pattern Adapter/Driver). Le détail se trouve dans [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+- **API commune `SwitchDriver`** : `DetectDeviceAsync`, `GetPortsAsync`, `GetVlansAsync`, `SetPortVlanAsync`, `GetLinkStatusAsync`, `SaveConfigAsync`. Toutes les écritures suivent un pipeline unique :
+  - simulation ;
+  - contrôle de la famille ;
+  - politique de sécurité ;
+  - revérification de l'état ;
+  - sauvegarde chiffrée obligatoire ;
+  - étapes vérifiées ;
+  - récupération propre au pilote en cas d'échec.
+- **Pilotes de référence** : Cisco IOS / IOS-XE et Allied Telesis AlliedWare Plus, reconstruits sur cette base. La famille AT-S95 reste en lecture seule.
+- **Nouvelles plateformes (expérimentales)** :
+  - Cisco NX-OS, Arista EOS, Dell OS6 / OS9 / OS10 ;
+  - Huawei VRP (commit à deux étapes et `save`) ;
+  - Juniper Junos (`configure private`, `commit and-quit`, `rollback 0`) ;
+  - MikroTik RouterOS (bridge VLAN, sauvegarde implicite) ;
+  - Ubiquiti EdgeSwitch (`vlan participation`, `write memory`) ;
+  - Ubiquiti UniFi via l'API du contrôleur (classique ou UniFi OS, CSRF, reconnexion, empreinte de certificat approuvée au premier usage) ou via SSH local en lecture seule.
+- **Factory** : sélection manuelle ou détection automatique depuis le prompt d'accueil, puis `show version` / `show system` / `display version` / `/system resource print`. Le constructeur choisi sert de repli.
+- **Parsing** :
+  - moteur TextFSM compatible ntc-templates (Filldown, Required, List, Continue, Error, EOF) ;
+  - parseurs par expressions régulières et par colonnes ;
+  - JSON pour le contrôleur UniFi.
+- **Grammaire des interfaces par plateforme** (`PortNames`) : forme affichée, forme de commande et clé de comparaison, par exemple `Gi0/1` = `GigabitEthernet0/1`, `GE0/0/1`, `ge-0/0/1`, `Port 7`.
+- **Correctifs trouvés par les nouveaux tests** :
+  - `PortNames.IsAggregate` ne classe plus le « Port 7 » UniFi comme agrégat ;
+  - le modèle Huawei est lu depuis `display version` ;
+  - le VLAN `--` de Dell OS9 signifie « aucun VLAN » ;
+  - une transition TextFSM réduite à un nom d'état est acceptée ;
+  - les valeurs RouterOS non citées contenant un espace (`last-link-up-time=2026-10-01 10:00:00`) ne sont plus tronquées.
+- **Tests** : 306 nouveaux tests (parseurs multi-constructeurs, plateformes, factory et pilotes, contrôleur UniFi simulé en HTTP).
+
 ## 1.0.9 — 1er octobre 2026
 
 Correctifs pour les anciennes séries Allied Telesis (AT-8000GS, logiciel AT-S95) : la console COM restait bloquée quel que soit le débit, alors que PuTTY fonctionnait.

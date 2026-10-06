@@ -15,9 +15,10 @@ internal sealed class TerminalBuffer
 
     // Pager signatures. Cisco IOS uses "--More--"; the AT-S95 / Cisco-SB / VCLI family prints a
     // "More: <space>, Quit: q…" line (sometimes followed by a spinning character); other devices
-    // say "Press any key" or "(q)uit". A space advances all of them. Matching is
+    // say "Press any key" or "(q)uit"; Huawei prints "---- More ----", Junos "---(more 42%)---" and
+    // RouterOS "-- [Q quit|D dump|down]". A space advances all of them. Matching is
     // case-insensitive and confined to the current line.
-    private static readonly string[] PagerPatterns = ["--more--", "-- more --", "more:", "press any key", "(q)uit"];
+    private static readonly string[] PagerPatterns = ["--more--", "-- more --", "more:", "press any key", "(q)uit", "---(more", "[q quit"];
 
     public void Append(string chunk, Action nextPage)
     {
