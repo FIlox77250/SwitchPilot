@@ -1,6 +1,12 @@
-# Validation de Switch Pilot 1.1.0
+# Validation de Switch Pilot 1.1.1
 
 État au 6 octobre 2026.
+
+## Version 1.1.1 : vérifications locales
+
+- Compilation de toute la solution : **zéro erreur, zéro avertissement**.
+- Suite complète : **532 tests réussis, 11 ignorés, 0 échec, 543 au total**, dont 17 nouveaux tests du lecteur Markdown (notes de version 1.1.0 réelles, liens non web refusés, entrées mal formées).
+- Rendu de la fenêtre de mise à jour vérifié par capture avec les notes de la version 1.1.0.
 
 ## Version 1.1.0 : vérifications locales
 

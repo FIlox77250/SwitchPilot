@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 — 6 octobre 2026
+
+- **Notes de version en Markdown** : la fenêtre de mise à jour affiche les nouveautés mises en forme (titres, gras, italique, listes imbriquées, tableaux, code, citations, liens) au lieu du texte brut. Seuls les liens http(s) s'ouvrent dans le navigateur ; le texte reste sélectionnable.
+- Lecteur Markdown sans dépendance (`SwitchPilot.Core.Text.Markdown`) et 17 tests associés.
+
 ## 1.1.0 — 6 octobre 2026
 
 Switch Pilot devient multi-constructeurs grâce à une architecture de pilotes (pattern Adapter/Driver). Le détail se trouve dans [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

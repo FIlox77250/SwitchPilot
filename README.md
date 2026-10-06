@@ -1,10 +1,10 @@
-# Switch Pilot 1.1.0
+# Switch Pilot 1.1.1
 
 Application Windows de gestion de switchs multi-constructeurs, centrée sur le branchement Ethernet du poste. Cisco IOS et Allied Telesis (AlliedWare Plus, anciennes séries AT-S95 / AT-8000GS) sont les plateformes de référence. Cisco NX-OS, Arista EOS, Dell OS6/OS9/OS10, Huawei VRP, Juniper Junos, MikroTik RouterOS, Ubiquiti EdgeSwitch et UniFi sont pris en charge à titre expérimental (version 1.1.0). Première cible : Catalyst 2960 Plus / IOS 15.2. Interface WPF, connexions SSH et console série, simulation activée par défaut.
 
 ## Démarrer
 
-[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.1.0/SwitchPilot.exe) · [Release v1.1.0 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.1.0)
+[Télécharger SwitchPilot.exe](https://github.com/FIlox77250/SwitchPilot/releases/download/v1.1.1/SwitchPilot.exe) · [Release v1.1.1 et archive complète](https://github.com/FIlox77250/SwitchPilot/releases/tag/v1.1.1)
 
 Lancer **`artifacts/win-x64/SwitchPilot.exe`** avec un compte Windows standard. L’exécutable x64 contient .NET et WPF : aucun runtime, Python ou Java à installer. Il refuse de fonctionner avec un jeton administrateur. Seul l’installateur Npcap peut demander une élévation dans un processus séparé.
 
